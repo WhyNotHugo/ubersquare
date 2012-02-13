@@ -19,56 +19,132 @@ def debug(string):
 		print string
 
 def debug_json(string):
-	if (DEBUG):
-		debug(json.dumps(string, sort_keys=True, indent=4))
+	debug(json.dumps(string, sort_keys=True, indent=4))
+
+def foursquare_get(path, params):
+	f = urllib.urlopen(BASE_URL + path + "?" + params)
+	response = json.load(f,"UTF-8")
+	debug_json(response)
+	return response
+
+def foursquare_post(path, params):
+	f = urllib.urlopen(BASE_URL + path, params)
+	response = json.load(f,"UTF-8")
+	debug_json(response)
+	return response
 
 def get_history():
 	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208", 'group': "created"})
-	f = urllib.urlopen("{}/users/self/venuehistory?{}".format(BASE_URL, params))
-	response = json.load(f,"UTF-8")
-
+	response = foursquare_get("users/self/venuehistory", params)
 	venues = dict()
 	for item in response[u'response'][u'venues'][u'items']:
 		venues[item[u'venue'][u'id']]=item[u'venue']
 
-	return venues
+	#return venues
+	return response
+
+def get_self():
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208"})
+	response = foursquare_get("users/self", params)
+	return response
 
 def get_venue(venueId):
 	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208", 'group': "created"})
-	f = urllib.urlopen("{}/venues/{}?{}".format(BASE_URL, venueId, params))	
-
-	response = json.load(f)
-	debug_json(response)
+	response = foursquare_get("/venues/%s?" % venueId, params)
 	venue = response[u'response'][u'venue']
-
 	return venue
 
 def get_aproximate_location(venueId):
 	venue = get_venue(venueId)
-	lat = "{0:2.8f}".format(float((ord(venueId[0]) + (ord(venueId[1])*100)))/(10000*10000) + venue[u'location'][u'lat'])
-	lng = "{0:2.8f}".format(float((ord(venueId[2]) + (ord(venueId[3])*100)))/(10000*10000) + venue[u'location'][u'lng'])
+	lat = float((ord(venueId[0]) + (ord(venueId[1])*100)))/(10000*10000) + venue[u'location'][u'lat']
+	lat = "%2.8f" % lat
+	lng = float((ord(venueId[2]) + (ord(venueId[3])*100)))/(10000*10000) + venue[u'location'][u'lng']
+	lng = "%2.8f" % lng
 	ll = lat + "," + lng
-
 	return ll
 
 def checkin(venueId, ll):
+	"""
+	Checks in the user at venueId with lat/lng ll
+	"""
 	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208", 'venueId': venueId, 'broadcast': "public,facebook", 'll': ll})
-	f = urllib.urlopen("https://api.foursquare.com/v2/checkins/add", params)
+	response = foursquare_post("/checkins/add", params)
+	return response
 
-	response = json.load(f,"UTF-8")
-	debug(json.dumps(response, sort_keys=True, indent=4))
+def get_last_ll():
+	ll = dict()
+	for item in get_self()[u'response'][u'user'][u'checkins'][u'items']:
+		if item[u'type'] == "checkin":
+			ll['lat'] = item[u'venue'][u'location'][u'lat']
+			ll['lng'] = item[u'venue'][u'location'][u'lng']
+	ll = "%(lat)2.6f,%(lng)2.6f" % ll
+	return ll
+	
+#####################################
+
+def interactive_checkin_id(venueId):
+	venue = get_venue(venueId)
+	proceed = raw_input("Check in at " + repr(venue[u'name']) + ", " + repr(venue[u'location'][u'address']) + "?")
+	if (proceed == "y"):
+		ll = get_aproximate_location(venueId)
+		response = checkin(venueId,ll)
+		print "Checked into " + venueId + " using " + ll
+		for item in response[u'notifications']:
+			# if u'message' in item:
+			# 	print item[u'message']
+			if item[u'type'] == "message":
+				print "%s" % item[u'item'][u'message']
+			elif item[u'type'] == "score":
+				print "Total points: %d" % item[u'item'][u'total']
+				for score in item[u'item'][u'scores']:
+					print "%(points)d\t%(message)s" % \
+					{'points': score[u'points'], 'message' : score[u'message']}
+			
+	else:
+		print "Aborted"
+
+def interactive_chekin(venues):
+	"""
+	Recives a dict (num => venue) and wait for a user to input one of these numbers.
+	Will checkin at that location with auto-generated lat/lng
+	"""
+	i = int(raw_input("Select venue: "))
+	interactive_checkin_id(venues[i][u'venue'][u'id'])
+
+def interactive_history():
+	"""
+	Shows a list of recent places, a number to associate them,
+	and return this as a dict (num => venue).
+	"""
+	venues = dict()
+	i = 1;
+	for venue in get_history()[u'response'][u'venues'][u'items']:
+		venues[i] = venue
+		print "%(num)d\t%(name)s" % {'num' : i, 'name': venue[u'venue'][u'name']}
+		i += 1
+	return venues
+
+def interactive_ll():
+	print get_last_ll()
+
+# def explore_near_last():
+# 	p
+
+#def search
 
 if __name__ == "__main__":
-	if (len(sys.argv) >= 2):
-		venueId = sys.argv[1]
-		venue = get_venue(venueId)
-		proceed = raw_input("Check in at " + venue[u'name'] + ", " + repr(venue[u'location'][u'address']) + "?")
-		if (proceed == "y"):
-			ll = get_aproximate_location(venueId)
-			checkin(venueId,ll)
-			print "Checked into " + venueId + " using " + ll
-		else:
-			print "Aborted"
+	if (len(sys.argv) == 3):
+		if (sys.argv[1] == "ci"):
+			interactive_checkin_id(sys.argv[2])
+		if (sys.argv[1] == "ex"):
+			interactive_checkin_id(sys.argv[2])
+	elif (len(sys.argv) == 2):
+		if (sys.argv[1] == "ci"):
+			interactive_chekin(interactive_history())
+		if (sys.argv[1] == "ll"):
+			interactive_ll()
+		if (sys.argv[1] == "log"):
+			interactive_history()
 	else:
-		print "No venue id specified"
+		print "USAGE: ... COMMAND ID"
 		sys.exit()
