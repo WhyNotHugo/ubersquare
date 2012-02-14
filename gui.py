@@ -3,9 +3,11 @@ from PySide.QtCore import *
 from PySide.QtGui import *
 try:
 	from PySide.QtMaemo5 import *
+	maemo = True
 except ImportError:
 	print "Couldn't import QtMaemo5. You're probably not running on maemo."
 	print "I'll probably crash at some point, though some stuff will work."
+	maemo = False
 try:
 	import location
 except ImportError:
@@ -18,10 +20,13 @@ locationProvider = None
 
 class FullAGPSLocationProvider:
 	def __init__(self):
-		self.control = location.GPSDControl.get_default()
-		self.device = location.GPSDevice()
+		try:
+			self.control = location.GPSDControl.get_default()
+			self.device = location.GPSDevice()
 
-		self.control.set_properties(preferred_method=location.METHOD_ACWP|location.METHOD_AGNSS)
+			self.control.set_properties(preferred_method=location.METHOD_ACWP|location.METHOD_AGNSS)
+		except NameError:
+			return
 
 	def get_ll(self):
 		lat = "%2.8f" % self.device.fix[4]
@@ -92,37 +97,91 @@ class VenueModel(QAbstractListModel):
 		return self.venues[index.row()][u'venue']
 
 class VenueList(QListView):
-	def __init__(self, parent, venues):
+	def __init__(self, parent, venues, callback):
 		super(VenueList,self).__init__(parent)
 		self.model = VenueModel(venues)
 		self.setModel(self.model)
 		self.clicked.connect(self.venue_selected)
+		self.callback = callback
+
 
 	def venue_selected(self, index):
 		venue = self.model.get_venue(index)
-		c = CheckinConfirmation(self, venue)
-		c.exec_()
-		if c.buttonRole(c.clickedButton()) == QMessageBox.YesRole:
-			ll = get_aproximate_location(venue)
-			response = checkin(venue, ll)
-			CheckinDetails(self, response).show()
+		self.callback(self, venue)
 
 class VenueWindow(QMainWindow):
-	def __init__(self, parent, title, venues):
+	def __init__(self, parent, title, venues, callback):
 		super(VenueWindow, self).__init__(parent)
-		self.setAttribute(Qt.WA_Maemo5StackedWindow)
+		if maemo:
+			self.setAttribute(Qt.WA_Maemo5StackedWindow)
 
 		self.setWindowTitle(title)
 
-		self.cw = VenueList(self, venues)
+		self.cw = VenueList(self, venues, callback)
 		self.setCentralWidget(self.cw)
-		
+
+class VenueDetailsWindow(QMainWindow):
+	def __init__(self, parent, venue):
+		super(VenueDetailsWindow, self).__init__(parent)
+		if maemo:
+			self.setAttribute(Qt.WA_Maemo5StackedWindow)
+		self.venue = venue
+
+		self.setWindowTitle(venue[u'name'])
+
+		self.cw = QWidget(self)
+		self.setCentralWidget(self.cw)
+
+		layout = QGridLayout(self.cw)
+
+		if u'crossStreet' in venue[u'location']:
+			crossStreet = ", " + venue[u'location'][u'crossStreet']
+		else:
+			crossStreet = ""
+
+		checkin_button = QPushButton("Check-in")
+		#checkin_button.setIcon(QIcon.fromTheme("general_clock"))
+		self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
+
+		layout.addWidget(checkin_button, 0, 0, 1, 3)
+		layout.addWidget(QLabel("<b>" + venue[u'name'] + "</b>", self), 1, 0)
+		layout.addWidget(QLabel(venue[u'location'][u'address'] + crossStreet, self), 2, 0)
+		for item in venue[u'categories']:
+			if item[u'primary'] == "true":
+				layout.addWidget(QLabel(item[u'name'], self), 3, 0)
+		layout.addWidget(QLabel("Total Checkins: " + str(venue[u'stats'][u'checkinsCount']), self), 4, 0)
+		layout.addWidget(QLabel("Total Users: " + str(venue[u'stats'][u'usersCount']), self), 5, 0)
+		if u'beenHere' in venue:
+			if venue[u'beenHere'] == 1:
+				times = "time"
+			else:
+				times = "times"
+			layout.addWidget(QLabel("You've been here " + str(venue[u'beenHere']) + " " + times, self), 6, 0)
+
+		full_venue_button = QPushButton("More... (TODO)")
+		#checkin_button.setIcon(QIcon.fromTheme("general_clock"))
+		#self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
+
+		layout.addWidget(full_venue_button, 7, 0, 1, 3)
+
+		layout.setRowStretch(8, 5)
+
+	def checkin(self):
+		c = CheckinConfirmation(self, self.venue)
+		c.exec_()
+		if c.buttonRole(c.clickedButton()) == QMessageBox.YesRole:
+			ll = get_aproximate_location(self.venue)
+			response = checkin(self.venue, ll)
+			CheckinDetails(self, response).show()
 
 class MainWindow(QMainWindow):
 
 	def __init__(self):
 		super(MainWindow, self).__init__(None)
-		self.setAttribute(Qt.WA_Maemo5StackedWindow)
+		if maemo:
+			self.setAttribute(Qt.WA_Maemo5StackedWindow)
+
+		self.venue_click_handler = self.venue_details #checkin
 
 		self.cw = QWidget(self)
 		self.setCentralWidget(self.cw)
@@ -155,37 +214,61 @@ class MainWindow(QMainWindow):
 		vbox.addStretch()
 
 	def previous_venues_pushed(self):
+		self.working()
 		try:
-			a = VenueWindow(self, "Previous Venues", get_history())
+			a = VenueWindow(self, "Previous Venues", get_history(), self.venue_click_handler)
 			a.show()
 		except IOError:
-			self.ibox = QMaemo5InformationBox()
-			self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 8000)
+			network_error()
 
 	def todo_venues_pushed(self):
+		self.working()
 		try:
-			a = VenueWindow(self, "To-Do Venues", get_todo_venues())
+			a = VenueWindow(self, "To-Do Venues", get_todo_venues(), self.venue_click_handler)
 			a.show()
 		except IOError:
-			self.ibox = QMaemo5InformationBox()
-			self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 15000)
+			network_error()
 
 	def search_venues_pushed(self):
 		d = QInputDialog(self)
 		d.setInputMode(QInputDialog.TextInput)
-		d.setLabelText("What do you want to search for?")
+		d.setLabelText("What do you want to search for?\n(Leave blank to explore)")
 		d.setOkButtonText("Search")
 		d.setWindowTitle("Search")
 		if d.exec_() == 1:
+			self.working()
 			try:
-				win = VenueWindow(self, "Search results", venues_search(d.textValue(), locationProvider.get_ll()))
+				win = VenueWindow(self, "Search results", venues_search(d.textValue(), locationProvider.get_ll()), self.venue_click_handler)
 				win.show()
 			except IOError:
-				self.ibox = QMaemo5InformationBox()
-				self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 15000)
+				network_error()
+
+	def network_error(self):
+		#TODO: pynofity
+		if maemo:
+			self.ibox = QMaemo5InformationBox()
+			self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 15000)
+
+	def working(self):
+		#TODO: pynofity
+		if maemo:
+			self.ibox = QMaemo5InformationBox()
+			self.ibox.information(self, "Working...", 1100)		
 
 	def location_pushed(self):
 		pass
+
+	def checkin(self, parent_window, venue):
+		c = CheckinConfirmation(parent_window, venue)
+		c.exec_()
+		if c.buttonRole(c.clickedButton()) == QMessageBox.YesRole:
+			ll = get_aproximate_location(venue)
+			response = checkin(venue, ll)
+			CheckinDetails(parent_window, response).show()
+
+	def venue_details(self, parent_window, venue):
+		d = VenueDetailsWindow(parent_window, venue)
+		d.show()
 			
 		
 # class QueryDialog(QDialog):
