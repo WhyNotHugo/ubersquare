@@ -5,7 +5,8 @@ from foursquare import *
 try:
 	import location
 except ImportError:
-	print "No GPS support"
+	print "Couldn't import location. You're probably not running maemo."
+	print "GPS Support disabled."
 
 def interactive_checkin_id(venueId):
 	venue = get_venue(venueId)

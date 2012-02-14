@@ -46,8 +46,16 @@ def get_history():
 		i += 1
 	return venues
 
-	#return venues
-	return response
+def get_todo_venues():
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208"})
+	response = foursquare_get("lists/self/todos", params)
+	venues = dict()
+	i = 0;
+	for venue in response[u'response'][u'list'][u'listItems'][u'items']:
+		venues[i] = venue
+		i += 1
+
+	return venues
 
 def get_self():
 	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208"})

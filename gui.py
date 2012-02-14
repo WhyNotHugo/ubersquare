@@ -2,10 +2,14 @@ import sys
 #from PySide import QtCore, QtGui
 from PySide.QtCore import *
 from PySide.QtGui import *
-from PySide.QtMaemo5 import *
+try:
+	from PySide.QtMaemo5 import *
+except ImportError:
+	print "Couldn't import QtMaemo5. You're probably not running on maemo."
+	print "I'll probably crash at some point, though some stuff will work."
 
 from foursquare import *
-from checkin import *
+#from checkin import *
 
 
 def sayHello():
@@ -25,13 +29,12 @@ class CheckinConfirmation(QMessageBox):
 		text += "?"
 		self.setText(text)
 
-		#self.setDetailedText(json.dumps(venue).replace("\n","<br>"))
-
 		self.addButton("Yes", QMessageBox.YesRole)
 		self.addButton("No", QMessageBox.NoRole)
 		self.setIcon(QMessageBox.Question)
 
 class CheckinDetails(QDialog):
+
 	def __init__(self, parent, checking_details):
 
 		super(CheckinDetails, self).__init__(parent)
@@ -48,21 +51,19 @@ class CheckinDetails(QDialog):
 					text += "<br>%(points)d  %(message)s" % \
 					{'points': score[u'points'], 'message' : score[u'message']}
 
-		l = QLabel(text)
-
 		vbox = QVBoxLayout()
-		vbox.addWidget(l)
+		vbox.addWidget(QLabel(text))
  	
-		b = QPushButton("Ok")
-		self.connect(b, SIGNAL("clicked()"), self.close)
+		ok_button = QPushButton("Ok")
+		self.connect(ok_button, SIGNAL("clicked()"), self.close)
  
-		vbox.addWidget(b)
+		vbox.addWidget(ok_button)
 		self.setLayout(vbox)
 
 class VenueModel(QAbstractListModel):
-	def __init__(self):
+	def __init__(self, venues):
 		super(VenueModel, self).__init__()
-		self.venues = get_history()
+		self.venues = venues
 
 	def rowCount(self, role=Qt.DisplayRole):
 		return len(self.venues)
@@ -71,51 +72,19 @@ class VenueModel(QAbstractListModel):
 		if role == Qt.DisplayRole:
 			venue = self.venues[index.row()][u'venue']
 			if u'address' in venue[u'location']:
-				return venue[u'name'] + "\n" + venue[u'location'][u'address']
+				return venue[u'name'] + "\n  " + venue[u'location'][u'address']
 			else:
 				return venue[u'name']
 
 	def get_venue(self, index):
 		return self.venues[index.row()][u'venue']
 
-v = True
-
-class MainWindow(QWidget):
-
-	def __init__(self):
-		super(MainWindow, self).__init__(None)
-
-		menubar = QMenuBar(self)
-		menu_File = QMenu(menubar)
-		self.setWindowTitle("UberSquare")
-
-		vbox = QVBoxLayout()
-		
-		checkin_button = QPushButton("Check in...")
-
-		self.connect(checkin_button, SIGNAL("clicked()"), self.checkin_button_pushed)
-
-		# my_list = QListWidget()
-		# my_list.addItem("<b>hola!</b>\nadfsafads")
-		# my_list.setSortingEnabled(True)
-
-		second_list = QListView(self)
-		self.model = VenueModel()
-		second_list.setModel(self.model)
-		second_list.clicked.connect(self.venue_selected)
-
-
-		vbox.addWidget(checkin_button)
-		# vbox.addWidget(my_list)
-		vbox.addWidget(second_list)
-
-
-		self.setLayout(vbox)
-		#selector = QMaemo5ListPickSelector(self)
-		#selector.show()
-
-		# self.ibox = QMaemo5InformationBox()
-		# self.ibox.information(self, "This message will freeze the screen", 3000)
+class VenueList(QListView):
+	def __init__(self, parent, venues):
+		super(VenueList,self).__init__(parent)
+		self.model = VenueModel(venues)
+		self.setModel(self.model)
+		self.clicked.connect(self.venue_selected)
 
 	def venue_selected(self, index):
 		venue = self.model.get_venue(index)
@@ -125,18 +94,79 @@ class MainWindow(QWidget):
 			ll = get_aproximate_location(venue)
 			response = checkin(venue, ll)
 			CheckinDetails(self, response).show()
+		
 
-	def checkin_button_pushed(self):
-		d = QDialog(self)
-		d.setWindowTitle("Hola!")
-		vbox = QVBoxLayout()
-		l = QLabel("Esto es tipo probando. No se si poner la lista en un dialog, u\n otra window. Esto se hace multiline solo?")
-		vbox.addWidget(l)
-		b = QPushButton("Close window")
-		self.connect(b, SIGNAL("clicked()"), d.close)
-		vbox.addWidget(b)
-		d.setLayout(vbox)
-		d.show()
+class HistoryWindow(QMainWindow):
+	def __init__(self, parent):
+		super(HistoryWindow, self).__init__(parent)
+		self.setAttribute(Qt.WA_Maemo5StackedWindow)
+
+		self.setWindowTitle("Previous Venues")
+
+		self.cw = VenueList(self, get_history())
+		self.setCentralWidget(self.cw)
+
+class TodoWindow(QMainWindow):
+	def __init__(self, parent):
+		super(TodoWindow, self).__init__(parent)
+		self.setAttribute(Qt.WA_Maemo5StackedWindow)
+
+		self.setWindowTitle("Todo Venues")
+
+		self.cw = VenueList(self, get_todo_venues())
+		self.setCentralWidget(self.cw)
+
+class MainWindow(QMainWindow):
+
+	def __init__(self):
+		super(MainWindow, self).__init__(None)
+		self.setAttribute(Qt.WA_Maemo5StackedWindow)
+
+		self.cw = QWidget(self)
+		self.setCentralWidget(self.cw)
+
+		# menubar = QMenuBar(self)
+		# menu_File = QMenu(menubar)
+		self.setWindowTitle("UberSquare")
+		vbox = QVBoxLayout(self.cw)
+		
+		previous_venues_button = QPushButton("Previous Venues")
+		previous_venues_button.setIcon(QIcon.fromTheme("general_clock"))
+		self.connect(previous_venues_button, SIGNAL("clicked()"), self.previous_venues_pushed)
+
+		todo_venues_button = QPushButton("To-Do List Venues")
+		todo_venues_button.setIcon(QIcon.fromTheme("calendar_todo"))
+		self.connect(todo_venues_button, SIGNAL("clicked()"), self.todo_venues_pushed)
+
+		vbox.addWidget(previous_venues_button)
+		vbox.addWidget(todo_venues_button)
+		vbox.addStretch()
+
+		#44self.setLayout(vbox)
+		#selector = QMaemo5ListPickSelector(self)
+		#selector.show()
+
+		# self.ibox = QMaemo5InformationBox()
+		# self.ibox.information(self, "This message will freeze the screen", 3000)
+
+	def previous_venues_pushed(self):
+		# d = QDialog(self)
+		# d.setWindowTitle("Hola!")
+		# vbox = QVBoxLayout()
+		# l = QLabel("Esto es tipo probando. No se si poner la lista en un dialog, u\n otra window. Esto se hace multiline solo?")
+		# vbox.addWidget(l)
+		# b = QPushButton("Close window")
+		# self.connect(b, SIGNAL("clicked()"), d.close)
+		# vbox.addWidget(b)
+		# d.setLayout(vbox)
+		# d.show()
+		a = HistoryWindow(self)
+		a.show()
+
+	def todo_venues_pushed(self):
+		a = TodoWindow(self)
+		a.show()
+		
 
 
 if __name__ == '__main__':
