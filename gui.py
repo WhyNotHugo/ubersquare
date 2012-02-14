@@ -1,5 +1,4 @@
 import sys
-#from PySide import QtCore, QtGui
 from PySide.QtCore import *
 from PySide.QtGui import *
 try:
@@ -7,15 +6,28 @@ try:
 except ImportError:
 	print "Couldn't import QtMaemo5. You're probably not running on maemo."
 	print "I'll probably crash at some point, though some stuff will work."
+try:
+	import location
+except ImportError:
+	print "Couldn't import location. You're probably not running maemo."
+	print "GPS Support disabled."
 
 from foursquare import *
-#from checkin import *
 
+locationProvider = None
 
-def sayHello():
-	print "Hello World!"
+class FullAGPSLocationProvider:
+	def __init__(self):
+		self.control = location.GPSDControl.get_default()
+		self.device = location.GPSDevice()
 
-#QDialog
+		self.control.set_properties(preferred_method=location.METHOD_ACWP|location.METHOD_AGNSS)
+
+	def get_ll(self):
+		lat = "%2.8f" % self.device.fix[4]
+		lng = "%2.8f" % self.device.fix[5]
+		return lat + "," + lng
+
 
 class CheckinConfirmation(QMessageBox):
 
@@ -94,27 +106,17 @@ class VenueList(QListView):
 			ll = get_aproximate_location(venue)
 			response = checkin(venue, ll)
 			CheckinDetails(self, response).show()
+
+class VenueWindow(QMainWindow):
+	def __init__(self, parent, title, venues):
+		super(VenueWindow, self).__init__(parent)
+		self.setAttribute(Qt.WA_Maemo5StackedWindow)
+
+		self.setWindowTitle(title)
+
+		self.cw = VenueList(self, venues)
+		self.setCentralWidget(self.cw)
 		
-
-class HistoryWindow(QMainWindow):
-	def __init__(self, parent):
-		super(HistoryWindow, self).__init__(parent)
-		self.setAttribute(Qt.WA_Maemo5StackedWindow)
-
-		self.setWindowTitle("Previous Venues")
-
-		self.cw = VenueList(self, get_history())
-		self.setCentralWidget(self.cw)
-
-class TodoWindow(QMainWindow):
-	def __init__(self, parent):
-		super(TodoWindow, self).__init__(parent)
-		self.setAttribute(Qt.WA_Maemo5StackedWindow)
-
-		self.setWindowTitle("Todo Venues")
-
-		self.cw = VenueList(self, get_todo_venues())
-		self.setCentralWidget(self.cw)
 
 class MainWindow(QMainWindow):
 
@@ -138,38 +140,75 @@ class MainWindow(QMainWindow):
 		todo_venues_button.setIcon(QIcon.fromTheme("calendar_todo"))
 		self.connect(todo_venues_button, SIGNAL("clicked()"), self.todo_venues_pushed)
 
+		search_venues_button = QPushButton("Search Venues")
+		#search_venues_button.setIcon(QIcon.fromTheme("calendar_todo"))
+		self.connect(search_venues_button, SIGNAL("clicked()"), self.search_venues_pushed)
+
+		location_button = QPushButton("Location")
+		location_button.setIcon(QIcon.fromTheme("gps_location"))
+		self.connect(location_button, SIGNAL("clicked()"), self.location_pushed)
+
 		vbox.addWidget(previous_venues_button)
 		vbox.addWidget(todo_venues_button)
+		vbox.addWidget(search_venues_button)
+		vbox.addWidget(location_button)
 		vbox.addStretch()
 
-		#44self.setLayout(vbox)
-		#selector = QMaemo5ListPickSelector(self)
-		#selector.show()
-
-		# self.ibox = QMaemo5InformationBox()
-		# self.ibox.information(self, "This message will freeze the screen", 3000)
-
 	def previous_venues_pushed(self):
-		# d = QDialog(self)
-		# d.setWindowTitle("Hola!")
-		# vbox = QVBoxLayout()
-		# l = QLabel("Esto es tipo probando. No se si poner la lista en un dialog, u\n otra window. Esto se hace multiline solo?")
-		# vbox.addWidget(l)
-		# b = QPushButton("Close window")
-		# self.connect(b, SIGNAL("clicked()"), d.close)
-		# vbox.addWidget(b)
-		# d.setLayout(vbox)
-		# d.show()
-		a = HistoryWindow(self)
-		a.show()
+		try:
+			a = VenueWindow(self, "Previous Venues", get_history())
+			a.show()
+		except IOError:
+			self.ibox = QMaemo5InformationBox()
+			self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 8000)
 
 	def todo_venues_pushed(self):
-		a = TodoWindow(self)
-		a.show()
+		try:
+			a = VenueWindow(self, "To-Do Venues", get_todo_venues())
+			a.show()
+		except IOError:
+			self.ibox = QMaemo5InformationBox()
+			self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 15000)
+
+	def search_venues_pushed(self):
+		d = QInputDialog(self)
+		d.setInputMode(QInputDialog.TextInput)
+		d.setLabelText("What do you want to search for?")
+		d.setOkButtonText("Search")
+		d.setWindowTitle("Search")
+		if d.exec_() == 1:
+			try:
+				win = VenueWindow(self, "Search results", venues_search(d.textValue(), locationProvider.get_ll()))
+				win.show()
+			except IOError:
+				self.ibox = QMaemo5InformationBox()
+				self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 15000)
+
+	def location_pushed(self):
+		pass
+			
 		
+# class QueryDialog(QDialog):
+# 	def __init__(self, parent, text, button_text):
+# 		super(QueryDialog, self).__init__(parent)
+# 		self.setWindowTitle("Input")
+# 		vbox = QVBoxLayout(self)
+	
+# 		label = QLabel(text, self)
+# 		button = QPushButton(button_text, self)
 
+# 		text_field = QInputDialog(self)
 
+# 		self.connect(button, SIGNAL("clicked()"), self.close)
+
+# 		vbox.addWidget(label)
+# 		vbox.addWidget(text_field)
+# 		vbox.addWidget(button)
+# 		self.setLayout(vbox)
+		
 if __name__ == '__main__':
+	locationProvider = FullAGPSLocationProvider()
+
 	app = QApplication(sys.argv)
 	main_window = MainWindow()
 	main_window.show()
