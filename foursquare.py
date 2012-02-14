@@ -57,6 +57,19 @@ def get_todo_venues():
 
 	return venues
 
+def venues_search(query, ll, limit = 25):
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208", 'query': query, 'll': ll, 'limit': limit})
+	response = foursquare_get("venues/search", params)
+	venues = dict()
+	i = 0;
+	for venue in response[u'response'][u'venues']:
+		# Esto puede parecer cualquiera, pero es para que tenga el mismo formato que los dem&aacute;s, y sean todas las listas iguales
+		venues[i] = dict()
+		venues[i][u'venue'] = venue
+		i += 1
+
+	return venues
+
 def get_self():
 	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208"})
 	response = foursquare_get("users/self", params)
