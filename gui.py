@@ -50,6 +50,14 @@ class CheckinConfirmation(QMessageBox):
 		self.addButton("No", QMessageBox.NoRole)
 		self.setIcon(QMessageBox.Question)
 
+class WaitDialog(QMessageBox):
+	def __init__(self, parent, text):
+		super(WaitDialog, self).__init__(parent)
+		self.setWindowTitle("Working...")
+		self.setText(text)
+
+		self.setIcon(QMessageBox.Information)
+
 class CheckinDetails(QDialog):
 
 	def __init__(self, parent, checking_details):
@@ -82,6 +90,8 @@ class VenueModel(QAbstractListModel):
 		super(VenueModel, self).__init__()
 		self.venues = venues
 
+	VenueRole = 849561745
+
 	def rowCount(self, role=Qt.DisplayRole):
 		return len(self.venues)
 
@@ -92,22 +102,31 @@ class VenueModel(QAbstractListModel):
 				return venue[u'name'] + "\n  " + venue[u'location'][u'address']
 			else:
 				return venue[u'name']
-
-	def get_venue(self, index):
-		return self.venues[index.row()][u'venue']
+		if role == VenueModel.VenueRole:
+			return self.venues[index.row()][u'venue']
 
 class VenueList(QListView):
 	def __init__(self, parent, venues, callback):
 		super(VenueList,self).__init__(parent)
 		self.model = VenueModel(venues)
-		self.setModel(self.model)
+		#self.setModel(self.model)
+		
+		self.proxy = QSortFilterProxyModel(self)
+		self.proxy.setSourceModel(self.model)
+		self.proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)
+		self.setModel(self.proxy)
+
 		self.clicked.connect(self.venue_selected)
 		self.callback = callback
 
 
 	def venue_selected(self, index):
-		venue = self.model.get_venue(index)
+		venue = self.proxy.data(index,VenueModel.VenueRole)
 		self.callback(self, venue)
+
+	def filter(self,text):
+		self.proxy.setFilterRegExp(text)
+		self.proxy.filterRegExp ()
 
 class VenueWindow(QMainWindow):
 	def __init__(self, parent, title, venues, callback):
@@ -117,8 +136,23 @@ class VenueWindow(QMainWindow):
 
 		self.setWindowTitle(title)
 
-		self.cw = VenueList(self, venues, callback)
+		self.cw = QWidget(self)
 		self.setCentralWidget(self.cw)
+
+		layout = QVBoxLayout(self.cw)
+
+		self.text_field = QLineEdit(self) #QPlainTextEdit es multilinea
+		self.text_field.setPlaceholderText("Type to filter")
+		self.list = VenueList(self, venues, callback)
+
+		self.text_field.textChanged.connect(self.filter)
+
+		layout.addWidget(self.text_field)
+		layout.addWidget(self.list)
+
+
+	def filter(self, text):
+		self.list.filter(text)
 
 class VenueDetailsWindow(QMainWindow):
 	def __init__(self, parent, venue):
@@ -134,10 +168,17 @@ class VenueDetailsWindow(QMainWindow):
 
 		layout = QGridLayout(self.cw)
 
-		if u'crossStreet' in venue[u'location']:
-			crossStreet = ", " + venue[u'location'][u'crossStreet']
+		if u'address' in venue[u'location']:
+			address = venue[u'location'][u'address']
 		else:
-			crossStreet = ""
+			address = ""
+
+		if u'crossStreet' in venue[u'location']:
+			if address != "":
+				address += ", "
+			else:
+				address = ""
+			address += venue[u'location'][u'crossStreet']
 
 		checkin_button = QPushButton("Check-in")
 		#checkin_button.setIcon(QIcon.fromTheme("general_clock"))
@@ -145,7 +186,7 @@ class VenueDetailsWindow(QMainWindow):
 
 		layout.addWidget(checkin_button, 0, 0, 1, 3)
 		layout.addWidget(QLabel("<b>" + venue[u'name'] + "</b>", self), 1, 0)
-		layout.addWidget(QLabel(venue[u'location'][u'address'] + crossStreet, self), 2, 0)
+		layout.addWidget(QLabel(address, self), 2, 0)
 		for item in venue[u'categories']:
 			if item[u'primary'] == "true":
 				layout.addWidget(QLabel(item[u'name'], self), 3, 0)
@@ -217,9 +258,10 @@ class MainWindow(QMainWindow):
 		self.working()
 		try:
 			a = VenueWindow(self, "Previous Venues", get_history(), self.venue_click_handler)
+			self.wait_dialog.close()
 			a.show()
 		except IOError:
-			network_error()
+			self.network_error()
 
 	def todo_venues_pushed(self):
 		self.working()
@@ -227,7 +269,7 @@ class MainWindow(QMainWindow):
 			a = VenueWindow(self, "To-Do Venues", get_todo_venues(), self.venue_click_handler)
 			a.show()
 		except IOError:
-			network_error()
+			self.network_error()
 
 	def search_venues_pushed(self):
 		d = QInputDialog(self)
@@ -241,7 +283,7 @@ class MainWindow(QMainWindow):
 				win = VenueWindow(self, "Search results", venues_search(d.textValue(), locationProvider.get_ll()), self.venue_click_handler)
 				win.show()
 			except IOError:
-				network_error()
+				self.network_error()
 
 	def network_error(self):
 		#TODO: pynofity
@@ -251,9 +293,12 @@ class MainWindow(QMainWindow):
 
 	def working(self):
 		#TODO: pynofity
-		if maemo:
-			self.ibox = QMaemo5InformationBox()
-			self.ibox.information(self, "Working...", 1100)		
+		# if maemo:
+			# self.ibox = QMaemo5InformationBox()
+			# self.ibox.information(self, "Working...", 1100)		
+		self.wait_dialog = WaitDialog(self, "Please wait...")
+		self.wait_dialog.exec_()
+
 
 	def location_pushed(self):
 		pass

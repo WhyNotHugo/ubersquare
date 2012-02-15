@@ -54,8 +54,9 @@ def get_todo_venues():
 	venues = dict()
 	i = 0;
 	for venue in response[u'response'][u'list'][u'listItems'][u'items']:
-		# Dirty, but the the model is too much in use to avoid this at 4am
-		venue[u'venue'][u'beenHere'] = venue[u'beenHere']
+		if u'beenHere' in venue:
+			 # Dirty, but the the model is too much in use to avoid this at 4am
+			venue[u'venue'][u'beenHere'] = venue[u'beenHere']
 		venues[i] = venue
 		i += 1
 
