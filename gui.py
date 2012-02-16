@@ -54,37 +54,73 @@ class MainWindow(QMainWindow):
 		super(MainWindow, self).__init__(None)
 		if maemo:
 			self.setAttribute(Qt.WA_Maemo5StackedWindow)
-
-		self.cw = QWidget(self)
-		self.setCentralWidget(self.cw)
-
-		# menubar = QMenuBar(self)
-		# menu_File = QMenu(menubar)
 		self.setWindowTitle("UberSquare")
-		vbox = QGridLayout(self.cw)
+		#layout.setContentsMargins
+
+		# self.cw = QWidget(self)
+		# self.setCentralWidget(self.cw)
+		# gridLayout = QGridLayout(self.cw)
+
+		self.centralWidget = QWidget() 
+ 		self.setCentralWidget(self.centralWidget) 
+
+		#Main Layout 
+		layout = QVBoxLayout() 
+		layout.setSpacing(0)         
+		self.centralWidget.setLayout(layout) 
+
+		#Content Layout 
+		self.container = QWidget() 
+
+		self.scrollArea = QScrollArea() 
+		self.scrollArea.setWidget(self.container)           
+
+		layout.addWidget(self.scrollArea)   
+
+		self.scrollArea.setWidgetResizable(True)
+
+		gridLayout = QGridLayout() 
+		self.container.setLayout(gridLayout) 
 		
-		previous_venues_button = QPushButton("Previous Venues")
+		previous_venues_button = QPushButton("Visited")
 		previous_venues_button.setIcon(QIcon.fromTheme("general_clock"))
 		self.connect(previous_venues_button, SIGNAL("clicked()"), self.previous_venues_pushed)
 
-		todo_venues_button = QPushButton("To-Do List Venues")
+		todo_venues_button = QPushButton("To-Do List")
 		todo_venues_button.setIcon(QIcon.fromTheme("calendar_todo"))
 		self.connect(todo_venues_button, SIGNAL("clicked()"), self.todo_venues_pushed)
 
-		search_venues_button = QPushButton("Search Venues")
-		#search_venues_button.setIcon(QIcon.fromTheme("calendar_todo"))
+		search_venues_button = QPushButton("Search/Explore")
 		self.connect(search_venues_button, SIGNAL("clicked()"), self.search_venues_pushed)
 
 		location_button = QPushButton("Location")
 		location_button.setIcon(QIcon.fromTheme("gps_location"))
 		self.connect(location_button, SIGNAL("clicked()"), self.location_pushed)
 
-		vbox.addWidget(QPushButton("Me"), 0, 0, 4, 1)
-		vbox.addWidget(previous_venues_button, 0, 1)
-		vbox.addWidget(todo_venues_button, 1, 1)
-		vbox.addWidget(search_venues_button, 2, 1)
-		vbox.addWidget(location_button, 3, 1)
-		vbox.setRowStretch(4, 5)
+		new_venue_button = QPushButton("Add")
+		#new_venue_button.setMinimumHeight(300)
+		self.connect(new_venue_button, SIGNAL("clicked()"), self.new_venue_pushed)
+
+		gridLayout.addWidget(QPushButton("Me"), 0, 0, 4, 1)
+		row = 0
+		gridLayout.addWidget(QLabel("<b>Venues</b>"), row, 1, Qt.AlignHCenter)
+		row += 1
+		gridLayout.addWidget(previous_venues_button, row, 1)
+		row += 1
+		gridLayout.addWidget(todo_venues_button, row, 1)
+		row += 1
+		gridLayout.addWidget(search_venues_button, row, 1)
+		row += 1
+		gridLayout.addWidget(new_venue_button, row, 1)
+		row += 1
+		gridLayout.addWidget(QLabel("<b>Settings</b>"), row, 1, Qt.AlignHCenter)
+		row += 1
+		gridLayout.addWidget(location_button, row, 1)
+		row += 1
+		for i in (1,5):
+			gridLayout.addWidget(QLabel("asdfas"), row, 1)
+			row += 1
+		#gridLayout.setRowStretch(row, 5)
 
 	def previous_venues_pushed(self):
 		try:
@@ -124,6 +160,9 @@ class MainWindow(QMainWindow):
 			self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 15000)
 
 	def location_pushed(self):
+		pass
+
+	def new_venue_pushed(self):
 		pass
 
 	def checkin(self, parent_window, venue):
