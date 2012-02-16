@@ -5,6 +5,9 @@ except ImportError:
 	import simplejson as json
 import urllib
 import sys
+import sqlite3
+import os
+import atexit
 
 CLIENT_ID="A0IJ0P4EFRO50JUEYALJDGR52RDS0O4H1OKPSIEYZ5LHSNGH"
 CLIENT_SECRET="ACDUWAODBXRUPXHMVVWOXXATFN0PM0GP2PSLI5MZZCTUQ2TV"
@@ -17,6 +20,16 @@ BASE_URL="https://api.foursquare.com/v2/"
 
 DEBUG = False
 
+if not os.path.exists("cache.sqlite"):
+	conn = sqlite3.connect("cache.sqlite")
+	conn.execute("CREATE TABLE queries (resource TEXT PRIMARY KEY, value TEXT)")
+else:
+	conn = sqlite3.connect("cache.sqlite")
+
+def close_db(db):
+	db.close()
+atexit.register(close_db,conn)
+
 def debug(string):
 	if (DEBUG):
 		print string
@@ -24,21 +37,41 @@ def debug(string):
 def debug_json(string):
 	debug(json.dumps(string, sort_keys=True, indent=4))
 
-def foursquare_get(path, params):
-	f = urllib.urlopen(BASE_URL + path + "?" + params)
-	response = json.load(f,"UTF-8")
+#params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208"})
+def foursquare_get(path, params, read_cache = False, callback = None):
+	resource = path + "?" + params
+	
+	if read_cache:
+		c = conn.cursor()
+		c.execute("SELECT value FROM queries WHERE resource = ?", (resource,))
+		row = c.fetchone()
+		if row is None:
+			url = urllib.urlopen(BASE_URL + resource)
+			response = url.read()
+			c.execute("INSERT INTO queries VALUES (?, ?)", (resource, response))
+			conn.commit()
+		else:
+			response = row[0]
+	else:
+		url = urllib.urlopen(BASE_URL + resource)
+		response = url.read()
+		# TODO: save result to cache
+
+	# TODO: UPDATE to results to cache
+
+	response = json.loads(response,"UTF-8")
 	debug_json(response)
 	return response
 
 def foursquare_post(path, params):
-	f = urllib.urlopen(BASE_URL + path, params)
-	response = json.load(f,"UTF-8")
+	resource = urllib.urlopen(BASE_URL + path, params)
+	response = json.load(resource, "UTF-8")
 	debug_json(response)
 	return response
 
-def get_history():
+def get_history(read_cache):
 	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208", 'group': "created"})
-	response = foursquare_get("users/self/venuehistory", params)
+	response = foursquare_get("users/self/venuehistory", params, read_cache)
 	venues = dict()
 	i = 0;
 	for venue in response[u'response'][u'venues'][u'items']:
@@ -48,9 +81,9 @@ def get_history():
 		i += 1
 	return venues
 
-def get_todo_venues():
+def get_todo_venues(read_cache):
 	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208"})
-	response = foursquare_get("lists/self/todos", params)
+	response = foursquare_get("lists/self/todos", params, read_cache)
 	venues = dict()
 	i = 0;
 	for venue in response[u'response'][u'list'][u'listItems'][u'items']:
