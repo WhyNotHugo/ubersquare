@@ -20,11 +20,19 @@ BASE_URL="https://api.foursquare.com/v2/"
 
 DEBUG = False
 
-if not os.path.exists("cache.sqlite"):
-	conn = sqlite3.connect("cache.sqlite")
+API_VERSION = "20120208"
+
+cache_dir = "/home/user/.cache/ubersquare/"
+query_cache = cache_dir + "cache.sqlite"
+
+if not os.path.exists(cache_dir):
+	os.makedirs(cache_dir)
+
+if not os.path.exists(query_cache):
+	conn = sqlite3.connect(query_cache)
 	conn.execute("CREATE TABLE queries (resource TEXT PRIMARY KEY, value TEXT)")
 else:
-	conn = sqlite3.connect("cache.sqlite")
+	conn = sqlite3.connect(query_cache)
 
 def close_db(db):
 	db.close()
@@ -37,7 +45,7 @@ def debug(string):
 def debug_json(string):
 	debug(json.dumps(string, sort_keys=True, indent=4))
 
-#params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208"})
+#params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION})
 def foursquare_get(path, params, read_cache = False, callback = None):
 	resource = path + "?" + params
 	
@@ -70,7 +78,7 @@ def foursquare_post(path, params):
 	return response
 
 def get_history(read_cache):
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208", 'group': "created"})
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION, 'group': "created"})
 	response = foursquare_get("users/self/venuehistory", params, read_cache)
 	venues = dict()
 	i = 0;
@@ -82,7 +90,7 @@ def get_history(read_cache):
 	return venues
 
 def get_todo_venues(read_cache):
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208"})
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION})
 	response = foursquare_get("lists/self/todos", params, read_cache)
 	venues = dict()
 	i = 0;
@@ -96,7 +104,7 @@ def get_todo_venues(read_cache):
 	return venues
 
 def venues_search(query, ll, limit = 25):
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208", 'query': query, 'll': ll, 'limit': limit})
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION, 'query': query, 'll': ll, 'limit': limit})
 	response = foursquare_get("venues/search", params)
 	venues = dict()
 	i = 0;
@@ -109,12 +117,12 @@ def venues_search(query, ll, limit = 25):
 	return venues
 
 def get_self():
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208"})
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION})
 	response = foursquare_get("users/self", params)
 	return response
 
 def get_venue(venueId):
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208", 'group': "created"})
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION, 'group': "created"})
 	response = foursquare_get("/venues/%s?" % venueId, params)
 	venue = response[u'response'][u'venue']
 	return venue
@@ -141,7 +149,7 @@ def checkin(venue, ll):
 	"""
 	Checks in the user at venueId with lat/lng ll
 	"""
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208", 'venueId': venue[u'id'], 'broadcast': "public,facebook", 'll': ll})
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION, 'venueId': venue[u'id'], 'broadcast': "public,facebook", 'll': ll})
 	response = foursquare_post("/checkins/add", params)
 	return response
 
@@ -149,7 +157,7 @@ def checkin_by_id(venueId, ll):
 	"""
 	Checks in the user at venueId with lat/lng ll
 	"""
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': "20120208", 'venueId': venueId, 'broadcast': "public,facebook", 'll': ll})
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION, 'venueId': venueId, 'broadcast': "public,facebook", 'll': ll})
 	response = foursquare_post("/checkins/add", params)
 	return response
 
@@ -161,6 +169,30 @@ def get_last_ll():
 			ll['lng'] = item[u'venue'][u'location'][u'lng']
 	ll = "%(lat)2.6f,%(lng)2.6f" % ll
 	return ll
+
+def get_venues_categories():
+	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION})
+	response = foursquare_get("venues/categories", params, True)
+	return response[u'response'][u'categories']
+
+def venue_add(venue, ignoreDuplicates = False, ignoreDuplicatesKey = None):
+	"""
+	required: name, ll
+	optional: address, crossAddress, city, state, zip, phone, twitter, primaryCategoryId, description, url
+	second_run: ignoreDuplicates, ignoreDuplicatesKey
+	"""
+	params = {'oauth_token': ACCESS_TOKEN, 'v': API_VERSION}
+	params = dict(params.items() + venue.items())
+	params = urllib.urlencode(params)
+
+	print json.dumps(params)
+
+	response = foursquare_post("venues/add", params)	
+
+	print "\n\n\n\n\n-----"
+	print json.dumps(response, sort_keys=True, indent=4)
+
+	return response
 
 if __name__ == "__main__":
 	print "This is the foursquare API library, you're not supposed to run this!"
