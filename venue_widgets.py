@@ -1,6 +1,8 @@
 from PySide.QtCore import *
 from PySide.QtGui import *
+import sys
 from foursquare import *
+import foursquare
 
 try:
 	from PySide.QtMaemo5 import *
@@ -187,3 +189,199 @@ class VenueDetailsWindow(QMainWindow):
 			ll = get_aproximate_location(self.venue)
 			response = checkin(self.venue, ll)
 			CheckinDetails(self, response).show()
+
+class CategoryModel(QAbstractListModel):
+	def __init__(self, categories):
+		super(CategoryModel, self).__init__()
+		self.categories = categories
+
+	def rowCount(self, role=Qt.DisplayRole):
+		return len(self.categories)
+
+	CategoryRole = 983488936
+	SubCategoriesRole = 235246646
+
+	def data(self, index, role=Qt.DisplayRole):
+		if role == Qt.DisplayRole:
+			return self.categories[index.row()][u'name']
+		if role == CategoryModel.CategoryRole:
+			return self.categories[index.row()]
+		if role == CategoryModel.SubCategoriesRole:
+			return self.categories[index.row()][u'categories']
+
+	def get_data(self, index):
+		return self.categories[index]
+
+class CategorySelector(QMaemo5ListPickSelector):
+	def __init__(self, categories):
+		super(CategorySelector, self).__init__()
+		self.setModel(CategoryModel(categories))
+
+class EventEmittingValueButton(QMaemo5ValueButton):
+	def __init__(self, text, callback, parent):
+		super(EventEmittingValueButton, self).__init__(text, parent)
+		self.callback = callback
+
+	def setValueText(self, text):
+		super(EventEmittingValueButton, self).setValueText(text)
+		self.callback(self.pickSelector().currentIndex())
+
+class NewVenueWindow(QMainWindow):
+	def __init__(self, parent, categories, ll):
+		super(NewVenueWindow, self).__init__(parent)
+		self.setAttribute(Qt.WA_Maemo5StackedWindow)
+		self.venue = dict()
+		self.venue['ignoreDuplicates'] = "false"
+
+		self.setWindowTitle("New Venue")
+
+		self.centralWidget = QWidget() 
+		self.setCentralWidget(self.centralWidget) 
+
+		#Main Layout 
+		layout = QVBoxLayout() 
+		layout.setSpacing(0)         
+		self.centralWidget.setLayout(layout) 
+
+		#Content Layout 
+		self.container = QWidget() 
+
+		self.scrollArea = QScrollArea() 
+		self.scrollArea.setWidget(self.container)           
+
+		layout.addWidget(self.scrollArea)   
+
+		self.scrollArea.setWidgetResizable(True)
+
+		gridLayout = QGridLayout() 
+		self.container.setLayout(gridLayout) 
+
+		#self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
+
+		i = 0
+		self.name = QLineEdit(self)
+		self.name.setPlaceholderText("Name")
+		gridLayout.addWidget(self.name, i, 0, 1, 2)
+
+		i += 1
+		self.address = QLineEdit(self)
+		self.address.setPlaceholderText("Address")
+		gridLayout.addWidget(self.address, i, 0)
+		self.crossAddress = QLineEdit(self)
+		self.crossAddress.setPlaceholderText("Cross Address")
+		gridLayout.addWidget(self.crossAddress, i, 1)
+
+		i += 1
+		self.city = QLineEdit(self)
+		self.city.setPlaceholderText("City")
+		gridLayout.addWidget(self.city, i, 0)
+		self.state = QLineEdit(self)
+		self.state.setPlaceholderText("State")
+		gridLayout.addWidget(self.state, i, 1)
+		
+		i += 1
+		self.zip = QLineEdit(self)
+		self.zip.setPlaceholderText("Zip")
+		gridLayout.addWidget(self.zip, i, 0)
+		self.phone = QLineEdit(self)
+		self.phone.setPlaceholderText("Phone")
+		gridLayout.addWidget(self.phone, i, 1)
+		
+		i += 1
+		self.twitter = QLineEdit(self)
+		self.twitter.setPlaceholderText("Twitter")
+		gridLayout.addWidget(self.twitter, i, 0)
+		self.url = QLineEdit(self)
+		self.url.setPlaceholderText("URL")
+		gridLayout.addWidget(self.url, i, 1)
+
+		i += 1
+		self.description = QLineEdit(self)
+		self.description.setPlaceholderText("Description")
+		gridLayout.addWidget(self.description, i, 0, 1, 2)
+
+		i += 1
+		self.category = EventEmittingValueButton("Category", self.category_selected, self)
+		gridLayout.addWidget(self.category, i, 0, 1, 2)
+		self.category.setPickSelector(CategorySelector(categories))
+		self.category.setValueLayout(QMaemo5ValueButton.ValueBesideText)
+
+		i += 1
+		self.subcategory = QMaemo5ValueButton("Subcategory", self)
+		gridLayout.addWidget(self.subcategory, i, 0, 1, 2)
+		self.subcategory.setValueLayout(QMaemo5ValueButton.ValueBesideText)
+		
+		i += 1
+		self.ll = QLineEdit(self)
+		self.ll.setPlaceholderText("Coordinates")
+		self.ll.setText(ll)
+		gridLayout.addWidget(QLabel("Latitude/Longitude: "), i, 0)
+		gridLayout.addWidget(self.ll, i, 1)
+
+		i += 1
+		self.add_venue_button = QPushButton("Add Venue")
+		self.connect(self.add_venue_button, SIGNAL("clicked()"), self.add_venue)
+		gridLayout.addWidget(self.add_venue_button, i, 0, 1 ,2)
+		
+	def category_selected(self, index):
+		if index != -1:
+			subcategories = self.category.pickSelector().model().get_data(index)[u'categories']
+			self.subcategory.setPickSelector(CategorySelector(subcategories))
+
+	def add_venue(self):
+		if self.name.text() == "":
+			self.ibox = QMaemo5InformationBox()
+			self.ibox.information(self, "No name has been specified for this venue.", 2000)
+		if self.ll.text() == "":
+			self.ibox = QMaemo5InformationBox()
+			self.ibox.information(self, "No ll has been specified for this venue.", 2000)
+
+		venue = dict()
+		venue['name'] = self.name.text()
+		venue['ll'] = self.ll.text()
+		venue['address'] = self.address.text()
+		venue['crossAddress'] = self.crossAddress.text()
+		venue['city'] = self.city.text()
+		venue['state'] = self.state.text()
+		venue['zip'] = self.zip.text()
+		venue['phone'] = self.phone.text()
+		venue['twitter'] = self.twitter.text()
+		venue['primaryCategoryId'] = self.subcategory.pickSelector().model().get_data(self.subcategory.pickSelector().currentIndex())[u'id']
+		venue['description'] = self.description.text()
+		venue['url'] = self.url.text()
+		venue['ignoreDuplicates'] = self.venue['ignoreDuplicates']
+		self.venue['ignoreDuplicates'] = "false"
+		if 'ignoreDuplicatesKey' in self.venue:
+			venue['ignoreDuplicatesKey'] = self.venue['ignoreDuplicatesKey']
+
+
+		response = foursquare.venue_add(venue)
+
+		if response[u'meta'][u'code'] == 409:
+			title = "Duplicate detected"
+	
+			venues = dict()
+			i = 0
+			for venue in response[u'response'][u'candidateDuplicateVenues']:
+				venues[i] = dict()
+				venues[i][u'venue'] = venue
+				i +=  1
+
+			msgBox = QMessageBox(self)
+			msgBox.setText("Foursquare says this venue looks like a duplicate.<br> Make sure it isn't; if it is, then click \"Add Venue\" again.")
+			msgBox.setWindowTitle(title)
+			msgBox.exec_()
+
+			self.venue['ignoreDuplicates'] = "true"
+			self.venue['ignoreDuplicatesKey'] = response[u'response'][u'ignoreDuplicatesKey']
+
+			w = VenueWindow(self, "Posible matches", venues)
+			w.show()
+		else:
+			msgBox = QMessageBox(self)
+			msgBox.setText("Venue successfully created")
+			msgBox.setWindowTitle("Venue added")
+			msgBox.exec_()
+
+			v = VenueDetailsWindow(self, response[u'response'][u'venue'])
+			v.show()

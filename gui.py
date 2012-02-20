@@ -1,6 +1,8 @@
 import sys
+sys.path.append('/home/user/ubersquare')
 from PySide.QtCore import *
 from PySide.QtGui import *
+
 try:
 	from PySide.QtMaemo5 import *
 	maemo = True
@@ -35,6 +37,9 @@ class FullAGPSLocationProvider:
 		lng = "%2.8f" % self.device.fix[5]
 		return lat + "," + lng
 
+if maemo:
+	locationProvider = FullAGPSLocationProvider()
+
 class VenueProviderThread(QThread):
 	def __init__(self, target, source, args):
 		super(VenueProviderThread, self).__init__()
@@ -62,7 +67,7 @@ class MainWindow(QMainWindow):
 		# gridLayout = QGridLayout(self.cw)
 
 		self.centralWidget = QWidget() 
- 		self.setCentralWidget(self.centralWidget) 
+		self.setCentralWidget(self.centralWidget) 
 
 		#Main Layout 
 		layout = QVBoxLayout() 
@@ -163,7 +168,8 @@ class MainWindow(QMainWindow):
 		pass
 
 	def new_venue_pushed(self):
-		pass
+		w = NewVenueWindow(self, foursquare.get_venues_categories(), foursquare.get_last_ll())
+		w.show()
 
 	def checkin(self, parent_window, venue):
 		c = CheckinConfirmation(parent_window, venue)
