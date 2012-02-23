@@ -9,6 +9,7 @@ import sqlite3
 import os
 from urlparse import urlparse
 import atexit
+from xdg import BaseDirectory
 
 CLIENT_ID="A0IJ0P4EFRO50JUEYALJDGR52RDS0O4H1OKPSIEYZ5LHSNGH"
 CLIENT_SECRET="ACDUWAODBXRUPXHMVVWOXXATFN0PM0GP2PSLI5MZZCTUQ2TV"
@@ -18,21 +19,30 @@ CODE="MFY3CM12JZHHSR43BJHTNN3C2ZIP3ZQRZNGA1CA35BH1NQMT"
 ACCESS_TOKEN="GSMXQNPBOYRT3XM54FKK31EBABYWADDTKEUKNG42JNWQIZZX"
 
 BASE_URL="https://api.foursquare.com/v2/"
-
+API_VERSION = "20120208"
 DEBUG = False
 
-API_VERSION = "20120208"
-
-cache_dir = "/home/user/.cache/ubersquare/"
-image_cache_dir = cache_dir + "images/"
-query_cache = cache_dir + "cache.sqlite"
+cache_dir = os.path.join(BaseDirectory.xdg_cache_home, "ubersquare/")
+image_dir = os.path.join(BaseDirectory.xdg_data_home, "ubersquare/images/")
+config_dir = os.path.join(BaseDirectory.xdg_config_home, "ubersquare/")
 
 if not os.path.exists(cache_dir):
 	os.makedirs(cache_dir)
+if not os.path.exists(image_dir):
+	os.makedirs(image_dir)
+if not os.path.exists(config_dir):
+	os.makedirs(config_dir)
 
+query_cache = cache_dir + "cache.sqlite"
 if not os.path.exists(query_cache):
 	conn = sqlite3.connect(query_cache)
 	conn.execute("CREATE TABLE queries (resource TEXT PRIMARY KEY, value TEXT)")
+	conn.close()
+
+config = config_dir + "config.sqlite"
+if not os.path.exists(config):
+	conn = sqlite3.connect(config)
+	conn.execute("CREATE TABLE config (property TEXT PRIMARY KEY, value TEXT)")
 	conn.close()
 
 def debug(string):
@@ -87,8 +97,8 @@ def foursquare_post(path, params):
 
 def image(path):
 	url = urlparse(path)
-	localdir = image_cache_dir + os.path.dirname(url.path)
-	localfile = image_cache_dir + url.path
+	localdir = image_dir + os.path.dirname(url.path)
+	localfile = image_dir + url.path
 
 	if not os.path.exists(localdir):
 		os.makedirs(localdir)
