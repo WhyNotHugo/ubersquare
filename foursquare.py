@@ -13,10 +13,9 @@ from xdg import BaseDirectory
 
 CLIENT_ID="A0IJ0P4EFRO50JUEYALJDGR52RDS0O4H1OKPSIEYZ5LHSNGH"
 CLIENT_SECRET="ACDUWAODBXRUPXHMVVWOXXATFN0PM0GP2PSLI5MZZCTUQ2TV"
-CALLBACK_URL="http://localhost:6060/auth"
+CALLBACK_URI="http://localhost:6060/auth"
 
-CODE="MFY3CM12JZHHSR43BJHTNN3C2ZIP3ZQRZNGA1CA35BH1NQMT"
-ACCESS_TOKEN="GSMXQNPBOYRT3XM54FKK31EBABYWADDTKEUKNG42JNWQIZZX"
+authData = dict()
 
 BASE_URL="https://api.foursquare.com/v2/"
 API_VERSION = "20120208"
@@ -56,8 +55,29 @@ def debug_json(string):
 # CACHE/FOURSQUARE #
 ####################
 
+def config_set(property, value):
+	conn = sqlite3.connect(config)
+	conn.execute("INSERT OR REPLACE INTO config VALUES (?, ?)", (property, value))
+	conn.commit()
+	conn.close()
+
+def config_get(property):
+	value = None
+	conn = sqlite3.connect(config)
+	c = conn.cursor()
+	c.execute("SELECT value FROM config WHERE property = ?", (property,))
+	row = c.fetchone()
+	if not row is None:
+		value = row[0]
+	conn.commit()
+	conn.close()
+	return value
+
 def foursquare_get(path, params, read_cache = False, callback = None):
-	resource = path + "?" + params
+	commonParams = {'oauth_token': authData['ACCESS_TOKEN'], 'v': API_VERSION}
+	allParams = urllib.urlencode(dict(commonParams.items() + params.items()))
+
+	resource = path + "?" + allParams
 	conn = sqlite3.connect(query_cache)
 
 	print "-----"
@@ -90,7 +110,10 @@ def foursquare_get(path, params, read_cache = False, callback = None):
 	return response
 
 def foursquare_post(path, params):
-	resource = urllib.urlopen(BASE_URL + path, params)
+	commonParams = {'oauth_token': authData['ACCESS_TOKEN'], 'v': API_VERSION}
+	allParams = urllib.urlencode(dict(commonParams.items() + params.items()))
+
+	resource = urllib.urlopen(BASE_URL + path, allParams)
 	response = json.load(resource, "UTF-8")
 	debug_json(response)
 	return response
@@ -130,18 +153,15 @@ def build_venue_array(source):
 ###############################################################################
 
 def get_history(read_cache):
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION, 'group': "created"})
-	response = foursquare_get("users/self/venuehistory", params, read_cache)
+	response = foursquare_get("users/self/venuehistory", {}, read_cache)
 	return build_venue_array(response[u'response'][u'venues'][u'items'])
 
 def get_todo_venues(read_cache):
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION})
-	response = foursquare_get("lists/self/todos", params, read_cache)
+	response = foursquare_get("lists/self/todos", {}, read_cache)
 	return build_venue_array(response[u'response'][u'list'][u'listItems'][u'items'])
 
 def venues_search(query, ll, limit = 25):
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION, 'query': query, 'll': ll, 'limit': limit})
-	response = foursquare_get("venues/search", params)
+	response = foursquare_get("venues/search", {'query': query, 'll': ll, 'limit': limit})
 	venues = dict()
 	i = 0;
 	for venue in response[u'response'][u'venues']:
@@ -149,20 +169,17 @@ def venues_search(query, ll, limit = 25):
 		venues[i] = dict()
 		venues[i][u'venue'] = venue
 		i += 1
-
 	return venues
 
 def get_user(uid, read_cache):
 	"""
 	Returns profile information for a given user, including selected badges and mayorships.
 	"""
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION})
-	response = foursquare_get("users/" + uid, params, read_cache)
+	response = foursquare_get("users/" + uid, {}, read_cache)
 	return response[u'response']
 
 def get_venue(venueId):
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION, 'group': "created"})
-	response = foursquare_get("/venues/%s?" % venueId, params)
+	response = foursquare_get("/venues/%s?" % venueId, {})
 	venue = response[u'response'][u'venue']
 	return venue
 
@@ -179,8 +196,7 @@ def checkin(venue, ll, shout = ""):
 	"""
 	Checks in the user at venue with lat/lng ll
 	"""
-	params = urllib.urlencode({'shout': shout, 'oauth_token': ACCESS_TOKEN, 'v': API_VERSION, 'venueId': venue[u'id'], 'broadcast': "public,facebook", 'll': ll})
-	response = foursquare_post("/checkins/add", params)
+	response = foursquare_post("/checkins/add", {'shout': shout, 'venueId': venue[u'id'], 'broadcast': "public,facebook", 'll': ll})
 	return response
 
 def get_last_ll():
@@ -204,8 +220,7 @@ def get_venues_categories():
 	"""
 	Returns a hierarchical list of categories applied to venues.
 	"""
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION})
-	response = foursquare_get("venues/categories", params, True)
+	response = foursquare_get("venues/categories", {}, True)
 	return response[u'response'][u'categories']
 
 def venue_add(venue, ignoreDuplicates = False, ignoreDuplicatesKey = None):
@@ -214,17 +229,11 @@ def venue_add(venue, ignoreDuplicates = False, ignoreDuplicatesKey = None):
 	optional: address, crossAddress, city, state, zip, phone, twitter, primaryCategoryId, description, url
 	second_run: ignoreDuplicates, ignoreDuplicatesKey
 	"""
-	params = {'oauth_token': ACCESS_TOKEN, 'v': API_VERSION}
-	params = dict(params.items() + venue.items())
-	params = urllib.urlencode(params)
-
-	response = foursquare_post("venues/add", params)
-
+	response = foursquare_post("venues/add", venue)
 	return response
 
 def users_leaderboard(read_cache):
-	params = urllib.urlencode({'oauth_token': ACCESS_TOKEN, 'v': API_VERSION})
-	response = foursquare_get("users/leaderboard", params, read_cache)
+	response = foursquare_get("users/leaderboard", {}, read_cache)
 	return response[u'response'][u'leaderboard'][u'items']
 
 ############################
@@ -243,8 +252,14 @@ def init_category_icon_cache():
 	categories = get_venues_categories()
 	for category in categories:
 		fetch_category_image(category)
-	
+
+def init():
+	print "Reading code/acces_token"
+	authData['CODE'] = config_get("code")
+	authData['ACCESS_TOKEN'] = config_get("access_token")
 
 if __name__ == "__main__":
 	print "This is the foursquare API library, you're not supposed to run this!"
 	sys.exit()
+else:
+	init()
