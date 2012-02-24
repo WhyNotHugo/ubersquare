@@ -12,6 +12,7 @@ except ImportError:
 	maemo = False
 
 from foursquare import *
+import foursquare_auth
 from venue_widgets import *
 import foursquare
 import locationProviders
@@ -309,7 +310,23 @@ class MainWindow(QMainWindow):
 
 if __name__ == '__main__':
 	app = QApplication(sys.argv)
-	main_window = MainWindow()
-	main_window.show()
+
+	token_present = config_get("access_token") != None
+
+	if not token_present:
+		msgBox = QMessageBox()
+		msgBox.setText("Hi! It looks like this is the first run!\n\nI'm going to open a browser window now, and I need you to authorize me so I can get data/do your check-ins, etc.")
+		msgBox.setWindowTitle("First run")
+		msgBox.addButton("Ok", QMessageBox.AcceptRole)
+		msgBox.addButton("Cancel", QMessageBox.RejectRole)
+		res = msgBox.exec_()
+		if msgBox.buttonRole(msgBox.clickedButton()) == QMessageBox.AcceptRole:
+			foursquare_auth.fetch_code()
+			foursquare_auth.fetch_token()
+			token_present = True
+
+	if token_present:
+		main_window = MainWindow()
+		main_window.show()
  
 	sys.exit(app.exec_())
