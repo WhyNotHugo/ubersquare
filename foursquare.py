@@ -61,6 +61,12 @@ def config_set(property, value):
 	conn.commit()
 	conn.close()
 
+def config_del(property):
+	conn = sqlite3.connect(config)
+	conn.execute("DELETE FROM config WHERE property = ?", (property,))
+	conn.commit()
+	conn.close()
+
 def config_get(property):
 	value = None
 	conn = sqlite3.connect(config)
