@@ -209,6 +209,9 @@ class MainWindow(QMainWindow):
 		location_button.setIcon(QIcon.fromTheme("gps_location"))
 		self.connect(location_button, SIGNAL("clicked()"), self.location_pushed)
 
+		logout_button = QPushButton("Forget credentials")
+		self.connect(logout_button, SIGNAL("clicked()"), self.logout_pushed)
+
 		new_venue_button = QPushButton("Add")
 		self.connect(new_venue_button, SIGNAL("clicked()"), self.new_venue_pushed)
 
@@ -258,11 +261,22 @@ class MainWindow(QMainWindow):
 		gridLayout.addWidget(QLabel("<b>Settings</b>"), row, 1, Qt.AlignHCenter)
 		row += 1
 		gridLayout.addWidget(location_button, row, 1)
+		row += 1
+		gridLayout.addWidget(logout_button, row, 1)
 
 	def leaderboard_button_pushed(self):
 		w = UserListWindow("Leaderboard", foursquare.users_leaderboard(False), self)
 		w.show();
 		# TODO: background update
+
+	def logout_pushed(self):
+		config_del("code")
+		config_del("access_token")
+		msgBox = QMessageBox()
+		msgBox.setText("I've gotten rid of your credentials. I'm going to close now, and if you run me again, it'll be like our first time all over again. Bye!")
+		msgBox.setWindowTitle("Credentials forgotten")
+		msgBox.exec_()
+		self.close()
 
 	def previous_venues_pushed(self):
 		try:
