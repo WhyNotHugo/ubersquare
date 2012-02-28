@@ -15,9 +15,69 @@ from foursquare import *
 import foursquare_auth
 from venue_widgets import *
 import foursquare
-import locationProviders
+from locationProviders import *
+from custom_widgets import SignalEmittingValueButton
 
-locationProvider = locationProviders.LastCheckinLocationProvider()
+class LocationProviderModel(QAbstractListModel):
+	def __init__(self):
+		super(LocationProviderModel, self).__init__()
+		self.__locationProviders = LocationProvider()
+		self.__locationProviders.init()
+
+	def rowCount(self, role=Qt.DisplayRole):
+		return self.__locationProviders.len()
+
+	LocationProviderRole = 54351385
+
+	def data(self, index, role=Qt.DisplayRole):
+		lp = self.__locationProviders.get(index.row())
+		if role == Qt.DisplayRole:
+			return lp.get_name()
+		if role == LocationProviderModel.LocationProviderRole:
+			return lp
+
+class LocationProviderSelector(QMaemo5ListPickSelector):
+	def __init__(self):
+		super(LocationProviderSelector, self).__init__()
+		self.setModel(LocationProviderModel())
+		
+		# This restores the last selected provider
+		previousIndex = foursquare.config_get("locationProvider");
+		if not previousIndex:
+			previousIndex = 0
+		else:
+			previousIndex = int(previousIndex)
+		self.setCurrentIndex(previousIndex)
+		LocationProvider().select(previousIndex)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -90,6 +150,11 @@ class UserListWindow(QMainWindow):
 		#layout.addWidget(self.text_field)
 		layout.addWidget(self.list)
 
+		updateUsers = Signal()
+		self.connect(self, SIGNAL("updateUsers()"), self._updateUsers)
+
+	def _updateUsers(self):
+		self.setUsers(self.parent().users())
 
 	def filter(self, text):
 		self.list.filter(text)
@@ -97,68 +162,75 @@ class UserListWindow(QMainWindow):
 	def setUsers(self, users):
 		self.list.setUsers(users)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class VenueProviderThread(QThread):
 	"""
 	Retrieves venues from source with args on a background thread, and then passes it over to target using the setVenues method
 	"""
-	def __init__(self, target, source, args):
+	def __init__(self, target, source, args, parent):
 		super(VenueProviderThread, self).__init__()
 		self.target = target
 		self.source = source
 		self.args = args
+		self.parentWindow = parent
 	
 	def run(self):
-		# try:
-		venues = self.source(*self.args)
-		self.target.setVenues(venues)
-		# except IOError:
-		# 	self.ibox = QMaemo5InformationBox()
-		# 	self.ibox.information(self.target, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 5000)
+		try:
+			venues = self.source(*self.args)
+			self.parentWindow.setVenues(venues)
+			self.target.updateVenues.emit()
+		except IOError:
+			self.parentWindow.networkError.emit()
 		self.exec_()
 		self.exit(0)
+
+class UserUpdaterThread(QThread):
+	"""
+	Retrieves users from source with args on a background thread, and then passes it over to target using the setUsers method
+	"""
+	def __init__(self, target, source, args, parent):
+		super(UserUpdaterThread, self).__init__()
+		self.target = target
+		self.source = source
+		self.args = args
+		self.parentWindow = parent
+	
+	def run(self):
+		try:
+			users = self.source(*self.args)
+			self.parentWindow.setUsers(users)
+			self.target.updateUsers.emit()
+		except IOError:
+			self.parentWindow.networkError.emit()
+		self.exec_()
+		self.exit(0)
+
+
+class Profile(QWidget):
+	def __init__(self, parent = None):
+		super(Profile, self).__init__(parent)
+		user = foursquare.get_user("self", True)[u'user']
+		photo = QImage(foursquare.image(user[u'photo']))
+		#photo.load()
+		photo_label = QLabel()
+		photo_label.setPixmap(QPixmap(photo))
+
+		name = "<b>"
+		if u'firstName' in user:
+			name += user[u'firstName'] + " "
+		if u'lastName' in user:
+			name += user[u'lastName']
+		name += "</b>"
+
+		badges = str(user[u'badges'][u'count']) + " badges"
+		mayorships = str(user[u'mayorships'][u'count']) + " mayorships"
+		checkins = str(user[u'checkins'][u'count']) + " checkins"
+
+		text = name + "<p>" + badges + "<br>" + mayorships + "<br>" + checkins 
+
+		profileLayout = QGridLayout()
+		self.setLayout(profileLayout)
+		profileLayout.addWidget(photo_label, 0, 0)
+		profileLayout.addWidget(QLabel(text), 0, 1, 1, 2)
 
 class MainWindow(QMainWindow):
 
@@ -166,6 +238,7 @@ class MainWindow(QMainWindow):
 		super(MainWindow, self).__init__(None)
 		if maemo:
 			self.setAttribute(Qt.WA_Maemo5StackedWindow)
+		#self.setAttribute(Qt.WA_Maemo5AutoOrientation, True)
 		self.setWindowTitle("UberSquare")
 		#layout.setContentsMargins
 
@@ -205,9 +278,11 @@ class MainWindow(QMainWindow):
 		search_venues_button = QPushButton("Search/Explore")
 		self.connect(search_venues_button, SIGNAL("clicked()"), self.search_venues_pushed)
 
-		location_button = QPushButton("Location")
-		location_button.setIcon(QIcon.fromTheme("gps_location"))
-		self.connect(location_button, SIGNAL("clicked()"), self.location_pushed)
+		self.location_button = SignalEmittingValueButton("Location", self.locationSelected, self)
+		#location_button.setIcon(QIcon.fromTheme("gps_location"))
+		self.location_button.setPickSelector(LocationProviderSelector())
+		self.location_button.setValueLayout(QMaemo5ValueButton.ValueUnderTextCentered)
+		#self.location_button.setValueLayout(QMaemo5ValueButton.ValueBesideText)
 
 		logout_button = QPushButton("Forget credentials")
 		self.connect(logout_button, SIGNAL("clicked()"), self.logout_pushed)
@@ -218,35 +293,8 @@ class MainWindow(QMainWindow):
 		leaderboard_button = QPushButton("Leaderboard")
 		self.connect(leaderboard_button, SIGNAL("clicked()"), self.leaderboard_button_pushed)
 
-
-		profile = QWidget()
-
-		user = foursquare.get_user("self", True)[u'user']
-		photo = QImage(foursquare.image(user[u'photo']))
-		#photo.load()
-		photo_label = QLabel()
-		photo_label.setPixmap(QPixmap(photo))
-
-		name = "<b>"
-		if u'firstName' in user:
-			name += user[u'firstName'] + " "
-		if u'lastName' in user:
-			name += user[u'lastName']
-		name += "</b>"
-
-		badges = str(user[u'badges'][u'count']) + " badges"
-		mayorships = str(user[u'mayorships'][u'count']) + " mayorships"
-		checkins = str(user[u'checkins'][u'count']) + " checkins"
-
-		text = name + "<p>" + badges + "<br>" + mayorships + "<br>" + checkins 
-
-		profileLayout = QGridLayout()
-		profile.setLayout(profileLayout)
-		profileLayout.addWidget(photo_label, 0, 0)
-		profileLayout.addWidget(QLabel(text), 0, 1, 1, 2)
-
 		row = 0
-		gridLayout.addWidget(profile, row, 0, 3, 1)
+		gridLayout.addWidget(Profile(), row, 0, 3, 1)
 		gridLayout.addWidget(QLabel("<b>Venues</b>"), row, 1, Qt.AlignHCenter)
 		row += 1
 		gridLayout.addWidget(previous_venues_button, row, 1)
@@ -256,18 +304,61 @@ class MainWindow(QMainWindow):
 		gridLayout.addWidget(leaderboard_button, row, 0)
 		gridLayout.addWidget(search_venues_button, row, 1)
 		row += 1
+		gridLayout.addWidget(self.location_button, row, 0)
 		gridLayout.addWidget(new_venue_button, row, 1)
 		row += 1
 		gridLayout.addWidget(QLabel("<b>Settings</b>"), row, 1, Qt.AlignHCenter)
 		row += 1
-		gridLayout.addWidget(location_button, row, 1)
-		row += 1
 		gridLayout.addWidget(logout_button, row, 1)
 
+		self.setupMenu()
+		self._venues = None
+
+		networkError = Signal()
+		self.connect(self, SIGNAL("networkError()"), self.__networkError)
+
+		showSearchResults = Signal()
+		self.connect(self, SIGNAL("showSearchResults()"), self.__showSearchResults)
+
+	def __networkError(self):
+		self.ibox = QMaemo5InformationBox()
+		self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 5000)
+
+	def __showSearchResults(self):
+		self.progressDialog().close()
+		# win = VenueListWindow(self, "Search results", venues_search(d.textValue(), LocationProvider().get_ll()))
+		# win.show()
+
+	def setVenues(self, venues):
+		self.__venues = venues
+
+	def venues(self):
+		return self.__venues
+
+	def setUsers(self, venues):
+		self.__users = venues
+
+	def users(self):
+		return self.__users
+
+	def setupMenu(self):
+		about = QAction(self)
+		about.setText("About")
+
+		settings = QAction(self)
+		settings.setText("Settings")
+
+		menubar = QMenuBar(self)
+		self.setMenuBar(menubar)
+
+		menubar.addAction(settings)
+		menubar.addAction(about)
+
 	def leaderboard_button_pushed(self):
-		w = UserListWindow("Leaderboard", foursquare.users_leaderboard(False), self)
+		w = UserListWindow("Leaderboard", foursquare.users_leaderboard(True), self)
+		t = UserUpdaterThread(w, users_leaderboard, (False,), self)
+		t.start()
 		w.show();
-		# TODO: background update
 
 	def logout_pushed(self):
 		config_del("code")
@@ -281,7 +372,7 @@ class MainWindow(QMainWindow):
 	def previous_venues_pushed(self):
 		try:
 			a = VenueListWindow(self, "Previous Venues", get_history(True))
-			w = VenueProviderThread(a, get_history, (False,))
+			w = VenueProviderThread(a, get_history, (False,), self)
 			w.start()
 			a.show()
 		except IOError:
@@ -290,7 +381,7 @@ class MainWindow(QMainWindow):
 	def todo_venues_pushed(self):
 		try:
 			a = VenueListWindow(self, "To-Do Venues", get_todo_venues(True))
-			w = VenueProviderThread(a, get_todo_venues, (False,))
+			w = VenueProviderThread(a, get_todo_venues, (False,), self)
 			w.start()
 			a.show()
 		except IOError:
@@ -304,7 +395,7 @@ class MainWindow(QMainWindow):
 		d.setWindowTitle("Search")
 		if d.exec_() == 1:
 			try:
-				win = VenueListWindow(self, "Search results", venues_search(d.textValue(), locationProvider.get_ll()))
+				win = VenueListWindow(self, "Search results", venues_search(d.textValue(), LocationProvider().get_ll()))
 				win.show()
 			except IOError:
 				self.network_error()
@@ -315,14 +406,15 @@ class MainWindow(QMainWindow):
 			self.ibox = QMaemo5InformationBox()
 			self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 15000)
 
-	def location_pushed(self):
-		pass
+	def locationSelected(self, index):
+		LocationProvider().select(index)
+		foursquare.config_set("locationProvider", index)
 
 	def new_venue_pushed(self):
-		w = NewVenueWindow(self, foursquare.get_venues_categories(), foursquare.get_last_ll())
+		w = NewVenueWindow(self, foursquare.get_venues_categories(), LocationProvider().get_ll())
 		w.show()
 
-if __name__ == '__main__':
+def start():
 	app = QApplication(sys.argv)
 
 	token_present = config_get("access_token") != None
@@ -344,3 +436,6 @@ if __name__ == '__main__':
 		main_window.show()
  
 	sys.exit(app.exec_())
+
+if __name__ == '__main__':
+	start()
