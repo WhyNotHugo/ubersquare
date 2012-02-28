@@ -3,6 +3,8 @@ from PySide.QtGui import *
 import sys
 from foursquare import *
 import foursquare
+from locationProviders import LocationProvider
+from custom_widgets import SignalEmittingValueButton
 
 try:
 	from PySide.QtMaemo5 import *
@@ -11,7 +13,6 @@ except ImportError:
 	maemo = False
 
 class CheckinConfirmation(QMessageBox):
-
 	def __init__(self, parent, venue):
 		super(CheckinConfirmation, self).__init__(parent)
 		
@@ -28,7 +29,6 @@ class CheckinConfirmation(QMessageBox):
 		
 class CheckinDetails(QDialog):
 	def __init__(self, parent, checking_details):
-
 		super(CheckinDetails, self).__init__(parent)
 		self.checking_details = checking_details
 		self.setWindowTitle("Check-in successful")
@@ -63,9 +63,9 @@ class CheckinDetails(QDialog):
 		vbox.addWidget(ok_button)
 		self.setLayout(vbox)
 
-class VenueModel(QAbstractListModel):
+class VenueListModel(QAbstractListModel):
 	def __init__(self, venues):
-		super(VenueModel, self).__init__()
+		super(VenueListModel, self).__init__()
 		self.venues = venues
 
 	VenueRole = 849561745
@@ -85,7 +85,7 @@ class VenueModel(QAbstractListModel):
 				prefix = venue[u'categories'][0][u'icon'][u'prefix']
 				extension = venue[u'categories'][0][u'icon'][u'name']
 				return QIcon(foursquare.image(prefix + "64" + extension))
-		elif role == VenueModel.VenueRole:
+		elif role == VenueListModel.VenueRole:
 			return venue
 
 	def setVenues(self, venues):
@@ -95,7 +95,7 @@ class VenueModel(QAbstractListModel):
 class VenueList(QListView):
 	def __init__(self, parent, venues):
 		super(VenueList,self).__init__(parent)
-		self.model = VenueModel(venues)
+		self.model = VenueListModel(venues)
 		#self.setModel(self.model)
 		
 		self.proxy = QSortFilterProxyModel(self)
@@ -106,7 +106,7 @@ class VenueList(QListView):
 		self.clicked.connect(self.venue_selected)
 
 	def venue_selected(self, index):
-		d = VenueDetailsWindow(self, self.proxy.data(index,VenueModel.VenueRole))
+		d = VenueDetailsWindow(self, self.proxy.data(index,VenueListModel.VenueRole))
 		d.show()
 
 	def filter(self,text):
@@ -138,6 +138,11 @@ class VenueListWindow(QMainWindow):
 		layout.addWidget(self.text_field)
 		layout.addWidget(self.list)
 
+		updateVenues = Signal()
+		self.connect(self, SIGNAL("updateVenues()"), self._updateVenues)
+
+	def _updateVenues(self):
+		self.setVenues(self.parent().venues())
 
 	def filter(self, text):
 		self.list.filter(text)
@@ -157,12 +162,10 @@ class VenueDetailsWindow(QMainWindow):
 		self.centralWidget = QWidget() 
 		self.setCentralWidget(self.centralWidget) 
 
-		#Main Layout 
 		layout = QVBoxLayout() 
 		layout.setSpacing(0)         
 		self.centralWidget.setLayout(layout) 
 
-		#Content Layout 
 		self.container = QWidget() 
 
 		self.scrollArea = QScrollArea() 
@@ -195,7 +198,6 @@ class VenueDetailsWindow(QMainWindow):
 			address2 += venue[u'location'][u'city']
 
 		checkin_button = QPushButton("Check-in")
-		#checkin_button.setIcon(QIcon.fromTheme("general_clock"))
 		self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
 
 		name = "<b>" + venue[u'name'] + "</b>"
@@ -230,8 +232,6 @@ class VenueDetailsWindow(QMainWindow):
 			gridLayout.addWidget(QLabel("You've been here " + times, self), i, 0)
 
 		full_venue_button = QPushButton("More... (TODO)")
-		#checkin_button.setIcon(QIcon.fromTheme("general_clock"))
-		#self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
 
 		i += 1
 		gridLayout.addWidget(full_venue_button, i, 0, 1, 3)
@@ -241,7 +241,7 @@ class VenueDetailsWindow(QMainWindow):
 		c.exec_()
 		if c.buttonRole(c.clickedButton()) == QMessageBox.YesRole:
 			try:
-				ll = foursquare.get_aproximate_location(self.venue)
+				ll = LocationProvider().get_ll(self.venue)
 				response = checkin(self.venue, ll, self.shout_text.text())
 				CheckinDetails(self, response).show()
 			except IOError:
@@ -275,15 +275,6 @@ class CategorySelector(QMaemo5ListPickSelector):
 		super(CategorySelector, self).__init__()
 		self.setModel(CategoryModel(categories))
 
-class EventEmittingValueButton(QMaemo5ValueButton):
-	def __init__(self, text, callback, parent):
-		super(EventEmittingValueButton, self).__init__(text, parent)
-		self.callback = callback
-
-	def setValueText(self, text):
-		super(EventEmittingValueButton, self).setValueText(text)
-		self.callback(self.pickSelector().currentIndex())
-
 class NewVenueWindow(QMainWindow):
 	def __init__(self, parent, categories, ll):
 		super(NewVenueWindow, self).__init__(parent)
@@ -313,8 +304,6 @@ class NewVenueWindow(QMainWindow):
 
 		gridLayout = QGridLayout() 
 		self.container.setLayout(gridLayout) 
-
-		#self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
 
 		i = 0
 		self.name = QLineEdit(self)
@@ -359,7 +348,7 @@ class NewVenueWindow(QMainWindow):
 		gridLayout.addWidget(self.description, i, 0, 1, 2)
 
 		i += 1
-		self.category = EventEmittingValueButton("Category", self.category_selected, self)
+		self.category = SignalEmittingValueButton("Category", self.category_selected, self)
 		gridLayout.addWidget(self.category, i, 0, 1, 2)
 		self.category.setPickSelector(CategorySelector(categories))
 		self.category.setValueLayout(QMaemo5ValueButton.ValueBesideText)

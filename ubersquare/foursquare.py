@@ -79,6 +79,12 @@ def config_get(property):
 	conn.close()
 	return value
 
+
+# True and False are to mantain some legacy code, but *will* be deprecated.
+CacheOnly = 3
+CacheIfPosible = True
+NoCache = False
+
 def foursquare_get(path, params, read_cache = False, callback = None):
 	commonParams = {'oauth_token': authData['ACCESS_TOKEN'], 'v': API_VERSION}
 	allParams = urllib.urlencode(dict(commonParams.items() + params.items()))
@@ -188,15 +194,6 @@ def get_venue(venueId):
 	response = foursquare_get("/venues/%s?" % venueId, {})
 	venue = response[u'response'][u'venue']
 	return venue
-
-def get_aproximate_location(venue):
-	venueId = venue[u'id']
-	lat = float((ord(venueId[0]) + (ord(venueId[1])*100)))/(10000*10000) + venue[u'location'][u'lat']
-	lat = "%2.8f" % lat
-	lng = float((ord(venueId[2]) + (ord(venueId[3])*100)))/(10000*10000) + venue[u'location'][u'lng']
-	lng = "%2.8f" % lng
-	ll = lat + "," + lng
-	return ll
 
 def checkin(venue, ll, shout = ""):
 	"""
