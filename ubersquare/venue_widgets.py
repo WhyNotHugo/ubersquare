@@ -201,7 +201,8 @@ class VenueDetailsWindow(QMainWindow):
 		self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
 
 		name = "<b>" + venue[u'name'] + "</b>"
-		name += " (" + venue[u'categories'][0][u'name'] + ")"
+		if len(venue[u'categories']) > 0:
+			name += " (" + venue[u'categories'][0][u'name'] + ")"
 
 		i = 0
 		gridLayout.addWidget(checkin_button, i, 0, 1, 3)

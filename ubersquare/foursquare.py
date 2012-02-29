@@ -255,6 +255,7 @@ def init_category_icon_cache():
 	categories = get_venues_categories()
 	for category in categories:
 		fetch_category_image(category)
+	print "done updating image cache"
 
 def init():
 	print "Reading code/acces_token"

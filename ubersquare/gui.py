@@ -1,5 +1,4 @@
 import sys
-sys.path.append('/home/user/ubersquare')
 from PySide.QtCore import *
 from PySide.QtGui import *
 
@@ -204,6 +203,20 @@ class UserUpdaterThread(QThread):
 		self.exec_()
 		self.exit(0)
 
+class ImageCacheThread(QThread):	
+	def __init__(self, parent):
+		super(ImageCacheThread, self).__init__()
+		self.__parent = parent
+		
+	def run(self):
+		try:
+			foursquare.init_category_icon_cache()
+			self.__parent.hideWaitingDialog.emit()
+		except IOError:
+			self.__parent.hideWaitingDialog.emit()
+			self.__parent.networkError.emit()
+		self.exec_()
+		self.exit(0)
 
 class Profile(QWidget):
 	def __init__(self, parent = None):
@@ -284,6 +297,9 @@ class MainWindow(QMainWindow):
 		self.location_button.setValueLayout(QMaemo5ValueButton.ValueUnderTextCentered)
 		#self.location_button.setValueLayout(QMaemo5ValueButton.ValueBesideText)
 
+		images_button = QPushButton("Update image cache")
+		self.connect(images_button, SIGNAL("clicked()"), self.imageCache_pushed)
+
 		logout_button = QPushButton("Forget credentials")
 		self.connect(logout_button, SIGNAL("clicked()"), self.logout_pushed)
 
@@ -307,8 +323,9 @@ class MainWindow(QMainWindow):
 		gridLayout.addWidget(self.location_button, row, 0)
 		gridLayout.addWidget(new_venue_button, row, 1)
 		row += 1
-		gridLayout.addWidget(QLabel("<b>Settings</b>"), row, 1, Qt.AlignHCenter)
+		gridLayout.addWidget(QLabel("<b>Settings</b>"), row, 0, 1, 2, Qt.AlignHCenter)
 		row += 1
+		gridLayout.addWidget(images_button, row, 0)
 		gridLayout.addWidget(logout_button, row, 1)
 
 		self.setupMenu()
@@ -320,14 +337,35 @@ class MainWindow(QMainWindow):
 		showSearchResults = Signal()
 		self.connect(self, SIGNAL("showSearchResults()"), self.__showSearchResults)
 
+		hideWaitingDialog = Signal()
+		self.connect(self, SIGNAL("hideWaitingDialog()"), self.__hideWaitingDialog)
+
+	def imageCache_pushed(self):
+		c = QMessageBox(self)
+		c.setWindowTitle("Update image cache?")
+		c.setText("This will update all the category images in the cache. Make sure you have a good connection, and don't have to pay-by-megabyte")
+		c.addButton("Yes", QMessageBox.YesRole)
+		c.addButton("No", QMessageBox.NoRole)
+		c.setIcon(QMessageBox.Question)
+		c.exec_()
+		if c.buttonRole(c.clickedButton()) == QMessageBox.YesRole:
+			t = ImageCacheThread(self)
+			t.start()
+			self.waitDialog = QMessageBox(self)
+			self.waitDialog.setWindowTitle("Please wait...")
+			self.waitDialog.setText("This dialog will auto-close once downloading finishes.")
+			self.waitDialog.exec_()
+
+	def __hideWaitingDialog(self):
+		print "hiding wait dialog!"
+		self.waitDialog.hide()
+
 	def __networkError(self):
 		self.ibox = QMaemo5InformationBox()
-		self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 5000)
+		self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 8000)
 
 	def __showSearchResults(self):
 		self.progressDialog().close()
-		# win = VenueListWindow(self, "Search results", venues_search(d.textValue(), LocationProvider().get_ll()))
-		# win.show()
 
 	def setVenues(self, venues):
 		self.__venues = venues
@@ -430,6 +468,11 @@ def start():
 			foursquare_auth.fetch_code()
 			foursquare_auth.fetch_token()
 			token_present = True
+			d = QMessageBox()
+			d.setWindowTitle("Image cache")
+			d.setText("In order to save bandwidth, category images are cached.  To download these images for a first time, click \"Update image cache\". This'll take some time, but will <b>really</b> speed up searches.")
+			d.addButton( "Ok", QMessageBox.YesRole)
+			d.exec_()
 
 	if token_present:
 		main_window = MainWindow()

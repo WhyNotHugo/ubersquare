@@ -1,3 +1,5 @@
 *.pyo
 *.pyc
 cache.sqlite
+build
+dist
