@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
 #
 # Permission to use, copy, modify, and distribute this software for any
@@ -21,9 +23,18 @@ from PySide.QtMaemo5 import QMaemo5ListPickSelector, QMaemo5ValueButton, QMaemo5
 import foursquare_auth
 from venue_widgets import *
 import foursquare
+from foursquare import Cache
 from locationProviders import *
 from threads import VenueProviderThread, UserUpdaterThread, ImageCacheThread
 from custom_widgets import SignalEmittingValueButton
+
+class WaitingDialog(QDialog):
+	def __init__(self, parent = None):
+		super(WaitingDialog, self).__init__(parent)
+		layout = QVBoxLayout()
+		layout.addWidget(QLabel("Please wait; fetching data from foursquare..."))
+		self.setLayout(layout)
+		self.setWindowTitle("Please wait")
 
 class LocationProviderModel(QAbstractListModel):
 	def __init__(self):
@@ -82,7 +93,6 @@ class UserListModel(QAbstractListModel):
 			return user
 
 	def setUsers(self, users):
-		print "users updated int he model"
 		self.users = users
 		self.reset()
 
@@ -125,9 +135,16 @@ class UserListWindow(QMainWindow):
 
 		updateUsers = Signal()
 		self.connect(self, SIGNAL("updateUsers()"), self._updateUsers)
+		self.shown = False
+
+	def show(self):
+		super(UserListWindow, self).show()
+		self.shown = True
 
 	def _updateUsers(self):
 		self.setUsers(self.parent().users())
+		if not self.shown:
+			self.show()
 
 	def filter(self, text):
 		self.list.filter(text)
@@ -138,7 +155,7 @@ class UserListWindow(QMainWindow):
 class Profile(QWidget):
 	def __init__(self, parent = None):
 		super(Profile, self).__init__(parent)
-		user = foursquare.get_user("self", True)[u'user']
+		user = foursquare.get_user("self", Cache.CacheOrGet)[u'user']
 		photo = QImage(foursquare.image(user[u'photo']))
 		photo_label = QLabel()
 		photo_label.setPixmap(QPixmap(photo))
@@ -247,6 +264,11 @@ class MainWindow(QMainWindow):
 		hideWaitingDialog = Signal()
 		self.connect(self, SIGNAL("hideWaitingDialog()"), self.__hideWaitingDialog)
 
+		showWaitingDialog = Signal()
+		self.connect(self, SIGNAL("showWaitingDialog()"), self.__showWaitingDialog)
+
+		self.waitDialog = WaitingDialog(self)
+
 	def imageCache_pushed(self):
 		c = QMessageBox(self)
 		c.setWindowTitle("Update image cache?")
@@ -263,13 +285,19 @@ class MainWindow(QMainWindow):
 			self.waitDialog.setText("This dialog will auto-close once downloading finishes.")
 			self.waitDialog.exec_()
 
+	def __showWaitingDialog(self):
+		self.waitDialog.show()
+
 	def __hideWaitingDialog(self):
-		print "hiding wait dialog!"
 		self.waitDialog.hide()
 
 	def __networkError(self):
-		self.ibox = QMaemo5InformationBox()
-		self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 8000)
+		self.waitDialog.hide()
+		d = QMessageBox()
+		d.setWindowTitle("Network Error")
+		d.setText("I couldn't connect to foursquare to retrieve data. Make sure you're connected to the internet, and try again (keep in mind that it may have been just a network glitch).")
+		d.addButton( "Ok", QMessageBox.YesRole)
+		d.exec_()
 
 	def __showSearchResults(self):
 		self.progressDialog().close()
@@ -289,6 +317,7 @@ class MainWindow(QMainWindow):
 	def setupMenu(self):
 		about = QAction(self)
 		about.setText("About")
+		self.connect(about, SIGNAL("triggered()"), self.__showAbout)
 
 		settings = QAction(self)
 		settings.setText("Settings")
@@ -299,11 +328,85 @@ class MainWindow(QMainWindow):
 		menubar.addAction(settings)
 		menubar.addAction(about)
 
+	def __showAbout(self):
+		title = "About UberSquare"
+		aboutText = """
+UberSquare is a foursquare for maemo, specifically, for the Nokia N900.  Be sure to report any bugs you may find, and feel free to email me if you have any suggestions, etc.
+"""
+
+		bsdLicense = """
+Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
+
+Permission to use, copy, modify, and distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+"""
+		foursquareDisclaimer = """
+This application uses the foursquare(r) application programming interface but is not endorsed or certified by Foursquare Labs, Inc.  All of the foursquare(r) logos (including all badges) and trademarks displayed on this application are the property of Foursquare Labs, Inc.
+"""
+
+		dialog = QDialog()
+		dialog.setWindowTitle(title)
+		dialog.centralWidget = QWidget() 
+
+		#Main Layout 
+		layout = QVBoxLayout() 
+		layout.setSpacing(0)         
+		dialog.setLayout(layout) 
+
+		#Content Layout 
+		self.container = QWidget() 
+
+		self.scrollArea = QScrollArea() 
+		self.scrollArea.setWidget(self.container)           
+
+		layout.addWidget(self.scrollArea)   
+
+		self.scrollArea.setWidgetResizable(True)
+
+		gridLayout = QGridLayout() 
+		self.container.setLayout(gridLayout) 
+
+		aboutTextLabel = QLabel(aboutText)
+		aboutTextLabel.setWordWrap(True)
+
+		bsdLicenseLabel = QLabel(bsdLicense)
+		bsdLicenseLabel.setWordWrap(True)
+
+		foursquareDisclaimerLabel = QLabel(foursquareDisclaimer)
+		foursquareDisclaimerLabel.setWordWrap(True)
+
+		gridLayout.addWidget(aboutTextLabel, 0, 0)
+		line = QFrame()
+		line.setFrameShape(QFrame.HLine)
+		line.setMaximumWidth(QApplication.desktop().screenGeometry().width() * 0.5)
+		gridLayout.addWidget(line, 1, 0)
+
+		gridLayout.addWidget(bsdLicenseLabel, 2, 0)
+		line = QFrame()
+		line.setFrameShape(QFrame.HLine)
+		line.setMaximumWidth(QApplication.desktop().screenGeometry().width() * 0.5)
+		gridLayout.addWidget(line, 3, 0)
+
+		gridLayout.addWidget(foursquareDisclaimerLabel, 4, 0)
+		line = QFrame()
+		line.setFrameShape(QFrame.HLine)
+		line.setMaximumWidth(QApplication.desktop().screenGeometry().width() * 0.5)
+		gridLayout.addWidget(line, 5, 0)
+
+		gridLayout.addWidget(QLabel("TODO: Insert \"powered by foursquare\" image here."), 6, 0)
+
+		dialog.exec_()
+
 	def leaderboard_button_pushed(self):
-		w = UserListWindow("Leaderboard", foursquare.users_leaderboard(True), self)
+		users = foursquare.users_leaderboard(foursquare.CacheOrNull)
+		w = UserListWindow("Leaderboard", users, self)
 		t = UserUpdaterThread(w, foursquare.users_leaderboard, self)
-		w.show()
 		t.start()
+		if users:
+			w.show()
+		else:
+			self.__showWaitingDialog()
 
 	def logout_pushed(self):
 		config_del("code")
@@ -315,22 +418,27 @@ class MainWindow(QMainWindow):
 		self.close()
 
 	def previous_venues_pushed(self):
-		try:
-			a = VenueListWindow(self, "Previous Venues", foursquare.get_history(True))
-			w = VenueProviderThread(a, foursquare.get_history, (False,), self)
-			w.start()
-			a.show()
-		except IOError:
-			self.network_error()
+		venues = foursquare.get_history(foursquare.CacheOrNull)
+		w = VenueListWindow("Previous Venues", venues, self)
+		t = VenueProviderThread(w, foursquare.get_history, self)
+		t.start()
+		if venues:
+			w.show()
+		else:
+			self.__showWaitingDialog()
 
 	def todo_venues_pushed(self):
 		try:
-			a = VenueListWindow(self, "To-Do Venues", foursquare.lists_todos(True))
-			w = VenueProviderThread(a, foursquare.lists_todos, (False,), self)
-			w.start()
-			a.show()
+			venues = foursquare.lists_todos(foursquare.CacheOrNull)
+			w = VenueListWindow("To-Do Venues", venues, self)
+			t = VenueProviderThread(w, foursquare.lists_todos, self)
+			t.start()
+			if venues:
+				w.show()
+			else:
+				self.__showWaitingDialog()
 		except IOError:
-			self.network_error()
+			self.networkError.emit()
 
 	def search_venues_pushed(self):
 		d = QInputDialog(self)
@@ -340,22 +448,21 @@ class MainWindow(QMainWindow):
 		d.setWindowTitle("Search")
 		if d.exec_() == 1:
 			try:
-				win = VenueListWindow(self, "Search results", foursquare.venues_search(d.textValue(), LocationProvider().get_ll()))
+				win = VenueListWindow("Search results", foursquare.venues_search(d.textValue(), LocationProvider().get_ll()), self)
 				win.show()
 			except IOError:
-				self.network_error()
-
-	def network_error(self):
-		self.ibox = QMaemo5InformationBox()
-		self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 15000)
+				self.networkError.emit()
 
 	def locationSelected(self, index):
 		LocationProvider().select(index)
 		foursquare.config_set("locationProvider", index)
 
 	def new_venue_pushed(self):
-		w = NewVenueWindow(self, foursquare.get_venues_categories(), LocationProvider().get_ll())
-		w.show()
+		try:
+			w = NewVenueWindow(self, foursquare.get_venues_categories(), LocationProvider().get_ll())
+			w.show()
+		except IOError:
+			self.networkError.emit()
 
 def start():
 	app = QApplication(sys.argv)
@@ -380,6 +487,15 @@ def start():
 			d.exec_()
 
 	if token_present:
+		try:
+			foursquare.get_user("self", Cache.CacheOrGet)
+		except IOError:
+			d = QMessageBox()
+			d.setWindowTitle("Network Error")
+			d.setText("I couldn't connect to foursquare to retrieve data. Make sure you're connected to the internet, and try again (keep in mind that it may have been just a network glitch).")
+			d.addButton( "Ok", QMessageBox.YesRole)
+			d.exec_()
+			
 		main_window = MainWindow()
 		main_window.show()
  
