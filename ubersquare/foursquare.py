@@ -1,4 +1,17 @@
-#!/usr/bin/python2
+# Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
 try:
 	import json
 except ImportError:
@@ -24,6 +37,8 @@ DEBUG = False
 cache_dir = os.path.join(BaseDirectory.xdg_cache_home, "ubersquare/")
 image_dir = os.path.join(BaseDirectory.xdg_data_home, "ubersquare/images/")
 config_dir = os.path.join(BaseDirectory.xdg_config_home, "ubersquare/")
+
+print "running devel engine!"
 
 if not os.path.exists(cache_dir):
 	os.makedirs(cache_dir)
@@ -85,6 +100,18 @@ CacheOnly = 3
 CacheIfPosible = True
 NoCache = False
 
+CacheOrNull = 3
+CacheOrGet = True
+NoCache = False
+
+def cacheModeToString(cacheMode):
+	if cacheMode == CacheOnly:
+		return "Get from cache or return null"
+	elif cacheMode == CacheIfPosible:
+		return "Get from cache or foursquare"
+	elif cacheMode == NoCache:
+		return "Don't read from cache"
+
 def foursquare_get(path, params, read_cache = False, callback = None):
 	commonParams = {'oauth_token': authData['ACCESS_TOKEN'], 'v': API_VERSION}
 	allParams = urllib.urlencode(dict(commonParams.items() + params.items()))
@@ -94,31 +121,29 @@ def foursquare_get(path, params, read_cache = False, callback = None):
 
 	print "-----"
 	print "Getting " + resource
-	print "Using cache: " + str(read_cache)
+	print "Using cache: " + cacheModeToString(read_cache) + "..."
 	
 	c = conn.cursor()
-	if read_cache:
+	if read_cache == CacheOrGet or read_cache == CacheOrNull:
 		c.execute("SELECT value FROM queries WHERE resource = ?", (resource,))
 		row = c.fetchone()
+		conn.close()
 		if row is None:
-			url = urllib.urlopen(BASE_URL + resource)
-			response = url.read()
-			c.execute("INSERT INTO queries VALUES (?, ?)", (resource, response))
-			conn.commit()
+			if read_cache == CacheOrGet:
+				return foursquare_get(path, params, NoCache, callback)
+			else:
+				return None
 		else:
 			response = row[0]
 	else:
-		url = urllib.urlopen(BASE_URL + resource)
-		response = url.read()
-		c.execute("UPDATE queries SET value = ?  WHERE resource = ?", (response, resource))
+		response = urllib.urlopen(BASE_URL + resource).read()
+		c.execute("INSERT OR REPLACE INTO queries VALUES (?, ?)", (resource, response))
 		conn.commit()
 
 	conn.close()
 
-	print "Done!"
-
-	response = json.loads(response,"UTF-8")
-	debug_json(response)
+	if response:
+		response = json.loads(response,"UTF-8")
 	return response
 
 def foursquare_post(path, params):
@@ -168,7 +193,7 @@ def get_history(read_cache):
 	response = foursquare_get("users/self/venuehistory", {}, read_cache)
 	return build_venue_array(response[u'response'][u'venues'][u'items'])
 
-def get_todo_venues(read_cache):
+def lists_todos(read_cache):
 	response = foursquare_get("lists/self/todos", {}, read_cache)
 	return build_venue_array(response[u'response'][u'list'][u'listItems'][u'items'])
 
@@ -234,6 +259,11 @@ def venue_add(venue, ignoreDuplicates = False, ignoreDuplicatesKey = None):
 	"""
 	response = foursquare_post("venues/add", venue)
 	return response
+
+def venues_venue(venueId, readCache = CacheIfPosible):
+	response = foursquare_get("venues/" + venueId, {}, readCache)
+	if response:
+		return response[u'response'][u'venue']
 
 def users_leaderboard(read_cache):
 	response = foursquare_get("users/leaderboard", {}, read_cache)
