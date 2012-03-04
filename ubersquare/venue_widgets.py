@@ -17,8 +17,12 @@ from PySide.QtCore import *
 from PySide.QtGui import *
 import sys
 import foursquare
+from foursquare import Cache
+from gui import WaitingDialog
 from locationProviders import LocationProvider
 from custom_widgets import SignalEmittingValueButton
+from threads import TipMarkTodoBackgroundThread, TipMarkDoneBackgroundThread
+import time
 
 try:
 	from PySide.QtMaemo5 import *
@@ -43,7 +47,11 @@ class VenueListModel(QAbstractListModel):
 		venue = self.venues[index.row()][u'venue']
 		if role == Qt.DisplayRole:
 			if u'address' in venue[u'location']:
-				return venue[u'name'] + "\n  " + venue[u'location'][u'address']
+				result = venue[u'name'] + "\n  " + venue[u'location'][u'address']
+				if len(result) < 72:
+					return result
+				else:
+					return result[0:67] + "[...]"
 			else:
 				return venue[u'name']
 		elif role == Qt.DecorationRole:
@@ -88,7 +96,7 @@ class VenueList(QListView):
 		self.model.setVenues(venues)
 
 class VenueListWindow(QMainWindow):
-	def __init__(self, parent, title, venues):
+	def __init__(self, title, venues, parent):
 		super(VenueListWindow, self).__init__(parent)
 		if maemo:
 			self.setAttribute(Qt.WA_Maemo5StackedWindow)
@@ -111,9 +119,16 @@ class VenueListWindow(QMainWindow):
 
 		updateVenues = Signal()
 		self.connect(self, SIGNAL("updateVenues()"), self._updateVenues)
+		self.shown = False
+
+	def show(self):
+		super(VenueListWindow, self).show()
+		self.shown = True
 
 	def _updateVenues(self):
 		self.setVenues(self.parent().venues())
+		if not self.shown:
+			self.show()
 
 	def filter(self, text):
 		self.list.filter(text)
@@ -127,27 +142,63 @@ class Tip(QWidget):
 
 		gridLayout = QGridLayout() 
 		self.setLayout(gridLayout) 
+		self.tip = tip
 
 		tipLabel = QLabel(tip[u'text'], self)
-		#tipLabel.setMaximumWidth(QApplication.desktop().screenGeometry().width())
 		tipLabel.setWordWrap(True)
 		gridLayout.addWidget(tipLabel, 0, 0, 2, 1)
-		done_checkbox = QCheckBox("Done! (" + str(tip[u'todo'][u'count']) + ")")
-		done_checkbox.setChecked(self.isTipDone(tip))
-		todo_checkbox = QCheckBox("To-do (" + str(tip[u'done'][u'count']) + ")")
-		gridLayout.addWidget(done_checkbox, 0, 1, 1, 1)
-		gridLayout.addWidget(todo_checkbox, 1, 1, 1, 1)
+
+		self.done_checkbox = QCheckBox("Done! (" + str(tip[u'done'][u'count']) + ")")
+		self.done_checkbox.setChecked(self.isTipDone())
+		self.done_checkbox.stateChanged.connect(self.markDone)
+
+		self.todo_checkbox = QCheckBox("To-do (" + str(tip[u'todo'][u'count']) + ")")
+		self.todo_checkbox.setChecked(self.isTipTodo())
+		self.todo_checkbox.stateChanged.connect(self.markTodo)
+
+		gridLayout.addWidget(self.done_checkbox, 0, 1, 1, 1)
+		gridLayout.addWidget(self.todo_checkbox, 1, 1, 1, 1)
 		gridLayout.setColumnStretch(0, 1)
 
-		#isChecked
-
-	def isTipDone(self, tip):
-		if u'listed' in tip:
-			if u'groups' in tip[u'listed']:
-				for group in tip[u'listed'][u'groups']:
-					if group[u'type'] == "dones":
+	def isTipInGroupType(self, groupType):
+		if u'listed' in self.tip:
+			if u'groups' in self.tip[u'listed']:
+				for group in self.tip[u'listed'][u'groups']:
+					if group[u'type'] == groupType:
 						return True
 		return False
+
+	def isTipDone(self):
+		return self.isTipInGroupType("dones")
+		
+	def isTipTodo(self):
+		return self.isTipInGroupType("todos")
+
+	def markTodo(self, state):
+		TipMarkTodoBackgroundThread(self.tip[u'id'], self.todo_checkbox.isChecked(), self).start()
+
+	def markDone(self, state):
+		TipMarkDoneBackgroundThread(self.tip[u'id'], self.done_checkbox.isChecked(), self).start()
+
+class NewTipWidget(QWidget):
+	def __init__(self, venueId, parent = None):
+		super(NewTipWidget, self).__init__(parent)
+
+		gridLayout = QGridLayout() 
+		self.setLayout(gridLayout) 
+		self.venueId = venueId
+
+		self.tip_text = QLineEdit()
+		self.tip_text.setPlaceholderText("Write something and then...")
+		gridLayout.addWidget(self.tip_text, 0, 0)
+
+		self.tip_button = QPushButton("TODO: Leave tip!")
+		self.tip_button.clicked.connect(self.addTip)
+		gridLayout.addWidget(self.tip_button, 0, 1)
+
+	def addTip(self):
+		# TODO: add tip self.tip_text.text()
+		pass
 
 class VenueDetailsWindow(QMainWindow):
 	def __init__(self, parent, venue, fullDetails):
@@ -237,7 +288,7 @@ class VenueDetailsWindow(QMainWindow):
 		for item in venue[u'categories']:
 			if u'primary' in item and item[u'primary'] == "true":
 				i += 1
-				gridLayout.addWidget(QLabel(item[u'name'], self), i, 0)
+				gridLayout.addWidget(QLabel(item[u'name'], self), i, 0, 1, 2)
 		i += 1
 		line = QFrame()
 		line.setFrameShape(QFrame.HLine)
@@ -281,15 +332,28 @@ class VenueDetailsWindow(QMainWindow):
 			self.connect(websiteButton, SIGNAL("clicked()"), self.openUrl)
 			gridLayout.addWidget(websiteButton, i, 1)
 
+		if u'mayor' in venue:
+			mayorName = venue[u'mayor'][u'user'][u'firstName']
+			mayorCount = venue[u'mayor'][u'count']
+			mayorText = mayorName + " is the mayor with " + str(mayorCount) + " checkins!"
+			mayorButton = QPushButton()
+			mayorButton.setText(mayorText)
+			mayorButton.setIcon(QIcon(foursquare.image(venue[u'mayor'][u'user'][u'photo'])))
+			i += 1
+			gridLayout.addWidget(mayorButton, i, 0, 1, 2, Qt.AlignHCenter)
+
 		# TODO: menu
 		# TODO: specials
 
 		if u'tips' in venue:
 			i += 1
 			if venue[u'tips'][u'count'] == 0:
-				gridLayout.addWidget(QLabel("<b>This venue has no tips</b>", self), i, 0)
-			else:	
-				gridLayout.addWidget(QLabel("<b>" + str(venue[u'tips'][u'count']) + "tips</b>", self), i, 0)
+				gridLayout.addWidget(QLabel("<b>There isn't a single tip!</b>", self), i, 0)
+			else:
+				if venue[u'tips'][u'count'] == 1:
+					gridLayout.addWidget(QLabel("<b>Just one tip</b>", self), i, 0)
+				else:
+					gridLayout.addWidget(QLabel("<b>" + str(venue[u'tips'][u'count']) + " tips</b>", self), i, 0)
 				for group in venue[u'tips'][u'groups']:
 					for tip in group[u'items']:
 						i += 1
@@ -300,8 +364,12 @@ class VenueDetailsWindow(QMainWindow):
 						line.setMaximumWidth(QApplication.desktop().screenGeometry().width() * 0.5)
 						gridLayout.addWidget(line, i, 0, 1, 2)
 
+			i += 1
+			gridLayout.addWidget(NewTipWidget(venue[u'id']), i, 0, 1 ,2)
+
+
 		if not fullDetails:
-			info_button_label = "More details (plus tips and comments)"
+			info_button_label = "More details (plus tips and stuff)"
 		else:
 			info_button_label = "Force refresh (updates cached data)"
 		more_info_button = QPushButton(info_button_label)
@@ -313,27 +381,38 @@ class VenueDetailsWindow(QMainWindow):
 		hideWaitingDialog = Signal()
 		self.connect(self, SIGNAL("hideWaitingDialog()"), self.__hideWaitingDialog)
 
+		showWaitingDialog = Signal()
+		self.connect(self, SIGNAL("showWaitingDialog()"), self.__showWaitingDialog)
+
+		showMoreInfo = Signal()
+		self.connect(self, SIGNAL("showMoreInfo()"), self.more_info)
+
+		self.waitDialog = WaitingDialog(self)
+
 	def startPhoneCall(self):
 		QDesktopServices.openUrl("tel:" + self.venue[u'contact']['phone'])
 
 	def openUrl(self):
 		QDesktopServices.openUrl(self.venue[u'url'])
 
+	def __showWaitingDialog(self):
+		self.waitDialog.exec_()
+
 	def __hideWaitingDialog(self):
-		print "hiding wait dialog!"
-		#self.waitDialog.hide()
+		self.waitDialog.hide()
 
 	def more_info(self):
-		# start thread that gets the info
-		t = VenueDetailsThread(self.venue['id'], not self.fullDetails, self)
-		t.start()
-		# show waiting dialog
-		# if !error: show details
-		while not t.venue:
-			pass
-		self.close()
-		v = VenueDetailsWindow(self.parent(), t.venue, True)
-		v.show()
+		if not self.fullDetails:
+			venue = foursquare.venues_venue(self.venue['id'], Cache.CacheOrNull)
+			if venue:
+				self.close()
+				v = VenueDetailsWindow(self.parent(), venue, True).show()
+				return
+
+		# FIXME!
+		self.fullDetails = False
+		VenueDetailsThread(self.venue['id'], self).start()
+		self.__showWaitingDialog()
 
 	def checkin(self):
 		c = CheckinConfirmation(self, self.venue)
@@ -348,17 +427,21 @@ class VenueDetailsWindow(QMainWindow):
 	 			self.ibox.information(self, "Network error; check-in failed. Please try again.", 15000)
 
 class VenueDetailsThread(QThread):	
-	def __init__(self, venueId, readCache, parent):
-		super(VenueDetailsThread, self).__init__()
+	def __init__(self, venueId, parent):
+		super(VenueDetailsThread, self).__init__(parent)
 		self.__parent = parent
 		self.venueId = venueId
-		self.venue = None #FIXME : get rid of this!
-		self.readCache = readCache
 		
 	def run(self):
 		try:
-			self.venue = foursquare.venues_venue(self.venueId, self.readCache)
+			venue = foursquare.venues_venue(self.venueId, Cache.ForceFetch)
+			if u'mayor' in venue:
+				print "there's a mayor!"
+				foursquare.image(venue[u'mayor'][u'user'][u'photo'])
 			self.__parent.hideWaitingDialog.emit()
+			# This tiny sleep in necesary to (a) Avoid an Xorg warning, (b) achieve a smoother transition
+			time.sleep(0.15)
+			self.__parent.showMoreInfo.emit()
 		except IOError:
 			self.__parent.hideWaitingDialog.emit()
 			self.__parent.networkError.emit()

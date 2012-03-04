@@ -14,20 +14,20 @@
 
 from PySide.QtCore import QThread
 import foursquare
-
+from foursquare import Cache
 
 class VenueProviderThread(QThread):
-	def __init__(self, target, source, args, parent):
-		super(VenueProviderThread, self).__init__()
+	def __init__(self, target, source, parent):
+		super(VenueProviderThread, self).__init__(parent)
 		self.target = target
 		self.source = source
-		self.args = args
 		self.parentWindow = parent
 	
 	def run(self):
 		try:
-			venues = self.source(*self.args)
+			venues = self.source(Cache.ForceFetch)
 			self.parentWindow.setVenues(venues)
+			self.parentWindow.hideWaitingDialog.emit()
 			self.target.updateVenues.emit()
 		except IOError:
 			self.parentWindow.networkError.emit()
@@ -43,11 +43,12 @@ class UserUpdaterThread(QThread):
 	
 	def run(self):
 		try:
-			users = self.source(foursquare.NoCache)
+			users = self.source(Cache.ForceFetch)
 			self.parentWindow.setUsers(users)
+			self.parentWindow.hideWaitingDialog.emit()
 			self.target.updateUsers.emit()
 		except IOError:
-			self._parent.networkError.emit()
+			self.parentWindow.networkError.emit()
 		self.exec_()
 		self.exit(0)
 
@@ -63,5 +64,35 @@ class ImageCacheThread(QThread):
 		except IOError:
 			self.__parent.hideWaitingDialog.emit()
 			self.__parent.networkError.emit()
+		self.exec_()
+		self.exit(0)
+
+class TipMarkDoneBackgroundThread(QThread):
+	def __init__(self, tipId, marked, parent):
+		super(TipMarkDoneBackgroundThread, self).__init__(parent)
+		self.parentWindow = parent
+		self.marked = marked
+		self.tipId = tipId
+	
+	def run(self):
+		try:
+			foursquare.tip_markdone(self.tipId, self.marked)			
+		except IOError:
+			self.parentWindow.networkError.emit()
+		self.exec_()
+		self.exit(0)
+
+class TipMarkTodoBackgroundThread(QThread):
+	def __init__(self, tipId, marked, parent):
+		super(TipMarkTodoBackgroundThread, self).__init__(parent)
+		self.parentWindow = parent
+		self.marked = marked
+		self.tipId = tipId
+	
+	def run(self):
+		try:
+			foursquare.tip_marktodo(self.tipId, self.marked)
+		except IOError:
+			self.parentWindow.networkError.emit()
 		self.exec_()
 		self.exit(0)

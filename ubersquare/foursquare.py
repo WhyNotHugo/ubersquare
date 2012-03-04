@@ -50,13 +50,14 @@ if not os.path.exists(config_dir):
 query_cache = cache_dir + "cache.sqlite"
 if not os.path.exists(query_cache):
 	conn = sqlite3.connect(query_cache)
-	conn.execute("CREATE TABLE queries (resource TEXT PRIMARY KEY, value TEXT)")
+	conn.execute("CREATE TABLE IF NOT EXISTS queries (resource TEXT PRIMARY KEY, value TEXT)")
+	#conn.execute("CREATE TABLE IF NOT EXISTS tips (tipId TEXT PRIMARY KEY, venueID TEXT, done BOOLEAN, todo BOOLEAN, tipText TEXT)")
 	conn.close()
 
 config = config_dir + "config.sqlite"
 if not os.path.exists(config):
 	conn = sqlite3.connect(config)
-	conn.execute("CREATE TABLE config (property TEXT PRIMARY KEY, value TEXT)")
+	conn.execute("CREATE TABLE IF NOT EXISTS config (property TEXT PRIMARY KEY, value TEXT)")
 	conn.close()
 
 def debug(string):
@@ -102,7 +103,12 @@ NoCache = False
 
 CacheOrNull = 3
 CacheOrGet = True
-NoCache = False
+ForceFetch = False
+
+class Cache:
+	CacheOrNull = 3
+	CacheOrGet = True
+	ForceFetch = False	
 
 def cacheModeToString(cacheMode):
 	if cacheMode == CacheOnly:
@@ -191,34 +197,38 @@ def build_venue_array(source):
 
 def get_history(read_cache):
 	response = foursquare_get("users/self/venuehistory", {}, read_cache)
-	return build_venue_array(response[u'response'][u'venues'][u'items'])
+	if response:
+		return build_venue_array(response[u'response'][u'venues'][u'items'])
 
 def lists_todos(read_cache):
 	response = foursquare_get("lists/self/todos", {}, read_cache)
-	return build_venue_array(response[u'response'][u'list'][u'listItems'][u'items'])
+	if response:
+		return build_venue_array(response[u'response'][u'list'][u'listItems'][u'items'])
 
 def venues_search(query, ll, limit = 25):
 	response = foursquare_get("venues/search", {'query': query, 'll': ll, 'limit': limit})
-	venues = dict()
-	i = 0;
-	for venue in response[u'response'][u'venues']:
-		# Esto puede parecer cualquiera, pero es para que tenga el mismo formato que los dem&aacute;s, y sean todas las listas iguales
-		venues[i] = dict()
-		venues[i][u'venue'] = venue
-		i += 1
-	return venues
+	if response:
+		venues = dict()
+		i = 0;
+		for venue in response[u'response'][u'venues']:
+			# Esto puede parecer cualquiera, pero es para que tenga el mismo formato que los dem&aacute;s, y sean todas las listas iguales
+			venues[i] = dict()
+			venues[i][u'venue'] = venue
+			i += 1
+		return venues
 
 def get_user(uid, read_cache):
 	"""
 	Returns profile information for a given user, including selected badges and mayorships.
 	"""
 	response = foursquare_get("users/" + uid, {}, read_cache)
-	return response[u'response']
+	if response:
+		return response[u'response']
 
 def get_venue(venueId):
 	response = foursquare_get("/venues/%s?" % venueId, {})
-	venue = response[u'response'][u'venue']
-	return venue
+	if response:
+		return response[u'response'][u'venue']
 
 def checkin(venue, ll, shout = ""):
 	"""
@@ -244,12 +254,13 @@ def get_last_ll():
 
 	return ll
 
-def get_venues_categories():
+def get_venues_categories(readCache = Cache.CacheOrGet):
 	"""
 	Returns a hierarchical list of categories applied to venues.
 	"""
-	response = foursquare_get("venues/categories", {}, True)
-	return response[u'response'][u'categories']
+	response = foursquare_get("venues/categories", {}, readCache)
+	if response:
+		return response[u'response'][u'categories']
 
 def venue_add(venue, ignoreDuplicates = False, ignoreDuplicatesKey = None):
 	"""
@@ -263,11 +274,38 @@ def venue_add(venue, ignoreDuplicates = False, ignoreDuplicatesKey = None):
 def venues_venue(venueId, readCache = CacheIfPosible):
 	response = foursquare_get("venues/" + venueId, {}, readCache)
 	if response:
+		#response > venue > tips > groups [] > items [] >
 		return response[u'response'][u'venue']
 
 def users_leaderboard(read_cache):
 	response = foursquare_get("users/leaderboard", {}, read_cache)
-	return response[u'response'][u'leaderboard'][u'items']
+	if response:
+		return response[u'response'][u'leaderboard'][u'items']
+
+def __delete_venue_with_tip(tipId):
+	# A nasty hack.  If a tip changes status in a venue, I uncache the venue, since
+	# the cached data is out-of-date, and manually synching this is pretty hard work
+	# This may change if future </lie>
+	conn = sqlite3.connect(query_cache)
+	conn.execute("DELETE FROM queries WHERE value LIKE ?", ("%"+tipId+"%",))
+	conn.commit()
+	conn.close()
+
+def tip_marktodo(tipId, marked):
+	if marked:
+		response = foursquare_post("tips/" + tipId + "/marktodo", {})
+	else:
+		response = foursquare_post("lists/self/todos/deleteitem", { 'itemId': tipId })
+	__delete_venue_with_tip(tipId)
+	return response
+
+def tip_markdone(tipId, marked):
+	if marked:
+		response = foursquare_post("tips/" + tipId + "/markdone", {})
+	else:
+		response = foursquare_post("lists/self/dones/deleteitem", { 'itemId': tipId })
+	__delete_venue_with_tip(tipId)
+	return response
 
 ############################
 # Extra one-time functions #
