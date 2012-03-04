@@ -12,3 +12,19 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from PySide.QtGui import QMessageBox
+
+class CheckinConfirmation(QMessageBox):
+	def __init__(self, parent, venue):
+		super(CheckinConfirmation, self).__init__(parent)
+		
+		self.setWindowTitle("Confirmation")
+		text = "Do you want to check-in at <b>" + venue[u'name'] + "</b>"
+		if u'address' in venue[u'location']:
+			text += " located at " + venue[u'location'][u'address']	
+		text += "?"
+		self.setText(text)
+
+		self.addButton("Yes", QMessageBox.YesRole)
+		self.addButton("No", QMessageBox.NoRole)
+		self.setIcon(QMessageBox.Question)

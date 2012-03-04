@@ -1,20 +1,28 @@
+# Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
 import sys
 from PySide.QtCore import *
 from PySide.QtGui import *
 
-try:
-	from PySide.QtMaemo5 import *
-	maemo = True
-except ImportError:
-	print "Couldn't import QtMaemo5. You're probably not running on maemo."
-	print "I'll probably crash at some point, though some stuff will work."
-	maemo = False
+from PySide.QtMaemo5 import QMaemo5ListPickSelector, QMaemo5ValueButton, QMaemo5InformationBox
 
-from foursquare import *
 import foursquare_auth
 from venue_widgets import *
 import foursquare
 from locationProviders import *
+from threads import VenueProviderThread, UserUpdaterThread, ImageCacheThread
 from custom_widgets import SignalEmittingValueButton
 
 class LocationProviderModel(QAbstractListModel):
@@ -49,40 +57,6 @@ class LocationProviderSelector(QMaemo5ListPickSelector):
 		self.setCurrentIndex(previousIndex)
 		LocationProvider().select(previousIndex)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class UserListModel(QAbstractListModel):
 	def __init__(self, users):
 		super(UserListModel, self).__init__()
@@ -108,6 +82,7 @@ class UserListModel(QAbstractListModel):
 			return user
 
 	def setUsers(self, users):
+		print "users updated int he model"
 		self.users = users
 		self.reset()
 
@@ -130,8 +105,7 @@ class UserList(QListView):
 class UserListWindow(QMainWindow):
 	def __init__(self, title, users, parent):
 		super(UserListWindow, self).__init__(parent)
-		if maemo:
-			self.setAttribute(Qt.WA_Maemo5StackedWindow)
+		self.setAttribute(Qt.WA_Maemo5StackedWindow)
 
 		self.setWindowTitle(title)
 
@@ -140,13 +114,13 @@ class UserListWindow(QMainWindow):
 
 		layout = QVBoxLayout(self.cw)
 
-		# self.text_field = QLineEdit(self) #QPlainTextEdit es multilinea
-		# self.text_field.setPlaceholderText("Type to filter")
+		self.text_field = QLineEdit(self)
+		self.text_field.setPlaceholderText("Type to filter")
 		self.list = UserList(users, self)
 
-		#self.text_field.textChanged.connect(self.filter)
+		self.text_field.textChanged.connect(self.filter)
 
-		#layout.addWidget(self.text_field)
+		layout.addWidget(self.text_field)
 		layout.addWidget(self.list)
 
 		updateUsers = Signal()
@@ -161,69 +135,11 @@ class UserListWindow(QMainWindow):
 	def setUsers(self, users):
 		self.list.setUsers(users)
 
-class VenueProviderThread(QThread):
-	"""
-	Retrieves venues from source with args on a background thread, and then passes it over to target using the setVenues method
-	"""
-	def __init__(self, target, source, args, parent):
-		super(VenueProviderThread, self).__init__()
-		self.target = target
-		self.source = source
-		self.args = args
-		self.parentWindow = parent
-	
-	def run(self):
-		try:
-			venues = self.source(*self.args)
-			self.parentWindow.setVenues(venues)
-			self.target.updateVenues.emit()
-		except IOError:
-			self.parentWindow.networkError.emit()
-		self.exec_()
-		self.exit(0)
-
-class UserUpdaterThread(QThread):
-	"""
-	Retrieves users from source with args on a background thread, and then passes it over to target using the setUsers method
-	"""
-	def __init__(self, target, source, args, parent):
-		super(UserUpdaterThread, self).__init__()
-		self.target = target
-		self.source = source
-		self.args = args
-		self.parentWindow = parent
-	
-	def run(self):
-		try:
-			users = self.source(*self.args)
-			self.parentWindow.setUsers(users)
-			self.target.updateUsers.emit()
-		except IOError:
-			self.parentWindow.networkError.emit()
-		self.exec_()
-		self.exit(0)
-
-class ImageCacheThread(QThread):	
-	def __init__(self, parent):
-		super(ImageCacheThread, self).__init__()
-		self.__parent = parent
-		
-	def run(self):
-		try:
-			foursquare.init_category_icon_cache()
-			self.__parent.hideWaitingDialog.emit()
-		except IOError:
-			self.__parent.hideWaitingDialog.emit()
-			self.__parent.networkError.emit()
-		self.exec_()
-		self.exit(0)
-
 class Profile(QWidget):
 	def __init__(self, parent = None):
 		super(Profile, self).__init__(parent)
 		user = foursquare.get_user("self", True)[u'user']
 		photo = QImage(foursquare.image(user[u'photo']))
-		#photo.load()
 		photo_label = QLabel()
 		photo_label.setPixmap(QPixmap(photo))
 
@@ -249,15 +165,8 @@ class MainWindow(QMainWindow):
 
 	def __init__(self):
 		super(MainWindow, self).__init__(None)
-		if maemo:
-			self.setAttribute(Qt.WA_Maemo5StackedWindow)
-		#self.setAttribute(Qt.WA_Maemo5AutoOrientation, True)
+		self.setAttribute(Qt.WA_Maemo5StackedWindow)
 		self.setWindowTitle("UberSquare")
-		#layout.setContentsMargins
-
-		# self.cw = QWidget(self)
-		# self.setCentralWidget(self.cw)
-		# gridLayout = QGridLayout(self.cw)
 
 		self.centralWidget = QWidget() 
 		self.setCentralWidget(self.centralWidget) 
@@ -292,10 +201,8 @@ class MainWindow(QMainWindow):
 		self.connect(search_venues_button, SIGNAL("clicked()"), self.search_venues_pushed)
 
 		self.location_button = SignalEmittingValueButton("Location", self.locationSelected, self)
-		#location_button.setIcon(QIcon.fromTheme("gps_location"))
 		self.location_button.setPickSelector(LocationProviderSelector())
 		self.location_button.setValueLayout(QMaemo5ValueButton.ValueUnderTextCentered)
-		#self.location_button.setValueLayout(QMaemo5ValueButton.ValueBesideText)
 
 		images_button = QPushButton("Update image cache")
 		self.connect(images_button, SIGNAL("clicked()"), self.imageCache_pushed)
@@ -394,9 +301,9 @@ class MainWindow(QMainWindow):
 
 	def leaderboard_button_pushed(self):
 		w = UserListWindow("Leaderboard", foursquare.users_leaderboard(True), self)
-		t = UserUpdaterThread(w, users_leaderboard, (False,), self)
+		t = UserUpdaterThread(w, foursquare.users_leaderboard, self)
+		w.show()
 		t.start()
-		w.show();
 
 	def logout_pushed(self):
 		config_del("code")
@@ -409,8 +316,8 @@ class MainWindow(QMainWindow):
 
 	def previous_venues_pushed(self):
 		try:
-			a = VenueListWindow(self, "Previous Venues", get_history(True))
-			w = VenueProviderThread(a, get_history, (False,), self)
+			a = VenueListWindow(self, "Previous Venues", foursquare.get_history(True))
+			w = VenueProviderThread(a, foursquare.get_history, (False,), self)
 			w.start()
 			a.show()
 		except IOError:
@@ -418,8 +325,8 @@ class MainWindow(QMainWindow):
 
 	def todo_venues_pushed(self):
 		try:
-			a = VenueListWindow(self, "To-Do Venues", get_todo_venues(True))
-			w = VenueProviderThread(a, get_todo_venues, (False,), self)
+			a = VenueListWindow(self, "To-Do Venues", foursquare.lists_todos(True))
+			w = VenueProviderThread(a, foursquare.lists_todos, (False,), self)
 			w.start()
 			a.show()
 		except IOError:
@@ -433,16 +340,14 @@ class MainWindow(QMainWindow):
 		d.setWindowTitle("Search")
 		if d.exec_() == 1:
 			try:
-				win = VenueListWindow(self, "Search results", venues_search(d.textValue(), LocationProvider().get_ll()))
+				win = VenueListWindow(self, "Search results", foursquare.venues_search(d.textValue(), LocationProvider().get_ll()))
 				win.show()
 			except IOError:
 				self.network_error()
 
 	def network_error(self):
-		#TODO: pynofity
-		if maemo:
-			self.ibox = QMaemo5InformationBox()
-			self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 15000)
+		self.ibox = QMaemo5InformationBox()
+		self.ibox.information(self, "Oops! I couldn't connect to foursquare.<br>Make sure you have a working internet connection.", 15000)
 
 	def locationSelected(self, index):
 		LocationProvider().select(index)
@@ -455,7 +360,7 @@ class MainWindow(QMainWindow):
 def start():
 	app = QApplication(sys.argv)
 
-	token_present = config_get("access_token") != None
+	token_present = foursquare.config_get("access_token") != None
 
 	if not token_present:
 		msgBox = QMessageBox()

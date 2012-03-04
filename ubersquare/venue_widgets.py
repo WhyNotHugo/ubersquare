@@ -1,7 +1,21 @@
+# Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
 from PySide.QtCore import *
+#from PySide.QtGui import QDesktopServices
 from PySide.QtGui import *
 import sys
-from foursquare import *
 import foursquare
 from locationProviders import LocationProvider
 from custom_widgets import SignalEmittingValueButton
@@ -12,57 +26,9 @@ try:
 except ImportError:
 	maemo = False
 
-class CheckinConfirmation(QMessageBox):
-	def __init__(self, parent, venue):
-		super(CheckinConfirmation, self).__init__(parent)
+from checkins import CheckinConfirmation
+from checkins import CheckinDetails
 		
-		self.setWindowTitle("Confirmation")
-		text = "Do you want to check-in at <b>" + venue[u'name'] + "</b>"
-		if u'address' in venue[u'location']:
-			text += " located at " + venue[u'location'][u'address']	
-		text += "?"
-		self.setText(text)
-
-		self.addButton("Yes", QMessageBox.YesRole)
-		self.addButton("No", QMessageBox.NoRole)
-		self.setIcon(QMessageBox.Question)
-		
-class CheckinDetails(QDialog):
-	def __init__(self, parent, checking_details):
-		super(CheckinDetails, self).__init__(parent)
-		self.checking_details = checking_details
-		self.setWindowTitle("Check-in successful")
-
-		message = ""
-		score = ""
-		mayorship = ""
-		badge = ""
-
-		for item in checking_details[u'notifications']:
-			if item[u'type'] == "message":
-				message += item[u'item'][u'message'] + "<p>"
-			elif item[u'type'] == "score":
-				score += "Total points: %d" % item[u'item'][u'total']
-				for scoreItem in item[u'item'][u'scores']:
-					score += "<br>+%(points)d   %(message)s" % \
-					{'points': scoreItem[u'points'], 'message' : scoreItem[u'message']}
-				score += "<p>"
-			elif item[u'type'] == "mayorship":
-				mayorship = item[u'item'][u'message']
-			elif item[u'type'] == "badge":
-				badge = "<p>" + item[u'item'][u'message']
-
-		text = message + score + mayorship + badge
-
-		vbox = QVBoxLayout()
-		vbox.addWidget(QLabel(text))
-	
-		ok_button = QPushButton("Ok")
-		self.connect(ok_button, SIGNAL("clicked()"), self.close)
- 
-		vbox.addWidget(ok_button)
-		self.setLayout(vbox)
-
 class VenueListModel(QAbstractListModel):
 	def __init__(self, venues):
 		super(VenueListModel, self).__init__()
@@ -106,7 +72,12 @@ class VenueList(QListView):
 		self.clicked.connect(self.venue_selected)
 
 	def venue_selected(self, index):
-		d = VenueDetailsWindow(self, self.proxy.data(index,VenueListModel.VenueRole))
+		venue = self.proxy.data(index,VenueListModel.VenueRole)
+		cachedVenue = foursquare.venues_venue(venue[u'id'], foursquare.CacheOnly)
+		if not cachedVenue:
+			d = VenueDetailsWindow(self, venue, False)
+		else:
+			d = VenueDetailsWindow(self, cachedVenue, True)
 		d.show()
 
 	def filter(self,text):
@@ -150,12 +121,41 @@ class VenueListWindow(QMainWindow):
 	def setVenues(self, venues):
 		self.list.setVenues(venues)
 
+class Tip(QWidget):
+	def __init__(self, tip, parent = None):
+		super(Tip, self).__init__(parent)
+
+		gridLayout = QGridLayout() 
+		self.setLayout(gridLayout) 
+
+		tipLabel = QLabel(tip[u'text'], self)
+		#tipLabel.setMaximumWidth(QApplication.desktop().screenGeometry().width())
+		tipLabel.setWordWrap(True)
+		gridLayout.addWidget(tipLabel, 0, 0, 2, 1)
+		done_checkbox = QCheckBox("Done! (" + str(tip[u'todo'][u'count']) + ")")
+		done_checkbox.setChecked(self.isTipDone(tip))
+		todo_checkbox = QCheckBox("To-do (" + str(tip[u'done'][u'count']) + ")")
+		gridLayout.addWidget(done_checkbox, 0, 1, 1, 1)
+		gridLayout.addWidget(todo_checkbox, 1, 1, 1, 1)
+		gridLayout.setColumnStretch(0, 1)
+
+		#isChecked
+
+	def isTipDone(self, tip):
+		if u'listed' in tip:
+			if u'groups' in tip[u'listed']:
+				for group in tip[u'listed'][u'groups']:
+					if group[u'type'] == "dones":
+						return True
+		return False
+
 class VenueDetailsWindow(QMainWindow):
-	def __init__(self, parent, venue, full = False):
+	def __init__(self, parent, venue, fullDetails):
 		super(VenueDetailsWindow, self).__init__(parent)
-		if maemo:
-			self.setAttribute(Qt.WA_Maemo5StackedWindow)
+		self.setAttribute(Qt.WA_Maemo5StackedWindow)
 		self.venue = venue
+
+		self.fullDetails = fullDetails
 
 		self.setWindowTitle(venue[u'name'])
 
@@ -166,10 +166,11 @@ class VenueDetailsWindow(QMainWindow):
 		layout.setSpacing(0)         
 		self.centralWidget.setLayout(layout) 
 
-		self.container = QWidget() 
+		self.container = QWidget()
 
 		self.scrollArea = QScrollArea() 
-		self.scrollArea.setWidget(self.container)           
+		self.scrollArea.setWidget(self.container)
+		self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
 		layout.addWidget(self.scrollArea)   
 
@@ -178,9 +179,13 @@ class VenueDetailsWindow(QMainWindow):
 		gridLayout = QGridLayout() 
 		self.container.setLayout(gridLayout) 
 
-		address = ""
-		address2 = ""
+		# name
+		name = "<b>" + venue[u'name'] + "</b>"
+		if len(venue[u'categories']) > 0:
+			name += " (" + venue[u'categories'][0][u'name'] + ")"
 
+		# address
+		address = ""
 		if u'address' in venue[u'location']:
 			address = venue[u'location'][u'address']
 
@@ -189,6 +194,8 @@ class VenueDetailsWindow(QMainWindow):
 				address += ", "
 			address += venue[u'location'][u'crossStreet']
 
+		# address2
+		address2 = ""
 		if u'postalCode' in venue[u'location']:
 			address2 = venue[u'location'][u'postalCode']
 
@@ -197,45 +204,136 @@ class VenueDetailsWindow(QMainWindow):
 				address2 += ", "
 			address2 += venue[u'location'][u'city']
 
+		# times
+		if u'beenHere' in venue:
+			if not fullDetails:
+				count = venue[u'beenHere']
+			else:
+				count = venue[u'beenHere']['count']
+			times = "<b>You've been here "
+			if count == 1:
+				times += "once"
+			else:
+				times += str(count) +" times"
+			times += "</b>"
+		else:
+			times = "<b>You've never been here</b>"
+
 		checkin_button = QPushButton("Check-in")
 		self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
 
-		name = "<b>" + venue[u'name'] + "</b>"
-		if len(venue[u'categories']) > 0:
-			name += " (" + venue[u'categories'][0][u'name'] + ")"
-
 		i = 0
-		gridLayout.addWidget(checkin_button, i, 0, 1, 3)
+		gridLayout.addWidget(checkin_button, i, 0, 1, 2)
 		i += 1
 		self.shout_text = QLineEdit(self)
 		self.shout_text.setPlaceholderText("Shout")
-		gridLayout.addWidget(self.shout_text, i, 0, 1, 3)
+		gridLayout.addWidget(self.shout_text, i, 0, 1, 2)
 		i += 1
-		gridLayout.addWidget(QLabel(name, self), i, 0)
+		gridLayout.addWidget(QLabel(name, self), i, 0, 1 ,2)
 		i += 1
-		gridLayout.addWidget(QLabel(address, self), i, 0)
+		gridLayout.addWidget(QLabel(address, self), i, 0, 1 ,2)
 		i += 1
-		gridLayout.addWidget(QLabel(address2, self), i, 0)
+		gridLayout.addWidget(QLabel(address2, self), i, 0, 1 ,2)
 		for item in venue[u'categories']:
-			if item[u'primary'] == "true":
+			if u'primary' in item and item[u'primary'] == "true":
 				i += 1
 				gridLayout.addWidget(QLabel(item[u'name'], self), i, 0)
 		i += 1
-		gridLayout.addWidget(QLabel("Total Checkins: " + str(venue[u'stats'][u'checkinsCount']), self), i, 0)
-		i += 1
-		gridLayout.addWidget(QLabel("Total Users: " + str(venue[u'stats'][u'usersCount']), self), i, 0)
-		if u'beenHere' in venue:
-			if venue[u'beenHere'] == 1:
-				times = "once"
-			else:
-				times = str(venue[u'beenHere']) +" times"
+		line = QFrame()
+		line.setFrameShape(QFrame.HLine)
+		gridLayout.addWidget(line, i, 0, 1, 2)
+
+		if u'description' in venue:
 			i += 1
-			gridLayout.addWidget(QLabel("You've been here " + times, self), i, 0)
-
-		full_venue_button = QPushButton("More... (TODO)")
+			gridLayout.addWidget(QLabel(venue[u'description'], self), i, 0, 1, 2)
+			i += 1
+			line = QFrame()
+			line.setFrameShape(QFrame.HLine)
+			gridLayout.addWidget(line, i, 0, 1, 2)
 
 		i += 1
-		gridLayout.addWidget(full_venue_button, i, 0, 1, 3)
+		gridLayout.addWidget(QLabel(times, self), i, 0)
+		i += 1
+		gridLayout.addWidget(QLabel("Total Checkins: " + str(venue[u'stats'][u'checkinsCount']), self), i, 0)
+		gridLayout.addWidget(QLabel("Total Visitors: " + str(venue[u'stats'][u'usersCount']), self), i, 1)
+
+		if u'hereNow' in venue:
+			hereNow = venue[u'hereNow'][u'count']
+			if hereNow == 0:
+				hereNow = "There's no one here now."
+			elif hereNow == 1:
+				hereNow = "There's just one person here now."
+			else:
+				hereNow = "There are " + repr(hereNow) + " people here now."
+			i += 1
+			gridLayout.addWidget(QLabel(hereNow, self), i, 0)
+
+		i += 1
+		if u'phone' in venue[u'contact']:
+			phoneCallButton = QPushButton("Call")
+			phoneCallButton.setIcon(QIcon.fromTheme("general_call"))
+			self.connect(phoneCallButton, SIGNAL("clicked()"), self.startPhoneCall)
+			gridLayout.addWidget(phoneCallButton, i, 0)
+				
+		if u'url' in venue:
+			websiteButton = QPushButton("Visit Website")
+			websiteButton.setIcon(QIcon.fromTheme("general_web"))
+			self.connect(websiteButton, SIGNAL("clicked()"), self.openUrl)
+			gridLayout.addWidget(websiteButton, i, 1)
+
+		# TODO: menu
+		# TODO: specials
+
+		if u'tips' in venue:
+			i += 1
+			if venue[u'tips'][u'count'] == 0:
+				gridLayout.addWidget(QLabel("<b>This venue has no tips</b>", self), i, 0)
+			else:	
+				gridLayout.addWidget(QLabel("<b>" + str(venue[u'tips'][u'count']) + "tips</b>", self), i, 0)
+				for group in venue[u'tips'][u'groups']:
+					for tip in group[u'items']:
+						i += 1
+						gridLayout.addWidget(Tip(tip), i, 0, 1, 2)
+						i += 1
+						line = QFrame()
+						line.setFrameShape(QFrame.HLine)
+						line.setMaximumWidth(QApplication.desktop().screenGeometry().width() * 0.5)
+						gridLayout.addWidget(line, i, 0, 1, 2)
+
+		if not fullDetails:
+			info_button_label = "More details (plus tips and comments)"
+		else:
+			info_button_label = "Force refresh (updates cached data)"
+		more_info_button = QPushButton(info_button_label)
+		self.connect(more_info_button, SIGNAL("clicked()"), self.more_info)
+
+		i += 1
+		gridLayout.addWidget(more_info_button, i, 0, 1, 2)
+
+		hideWaitingDialog = Signal()
+		self.connect(self, SIGNAL("hideWaitingDialog()"), self.__hideWaitingDialog)
+
+	def startPhoneCall(self):
+		QDesktopServices.openUrl("tel:" + self.venue[u'contact']['phone'])
+
+	def openUrl(self):
+		QDesktopServices.openUrl(self.venue[u'url'])
+
+	def __hideWaitingDialog(self):
+		print "hiding wait dialog!"
+		#self.waitDialog.hide()
+
+	def more_info(self):
+		# start thread that gets the info
+		t = VenueDetailsThread(self.venue['id'], not self.fullDetails, self)
+		t.start()
+		# show waiting dialog
+		# if !error: show details
+		while not t.venue:
+			pass
+		self.close()
+		v = VenueDetailsWindow(self.parent(), t.venue, True)
+		v.show()
 
 	def checkin(self):
 		c = CheckinConfirmation(self, self.venue)
@@ -243,11 +341,29 @@ class VenueDetailsWindow(QMainWindow):
 		if c.buttonRole(c.clickedButton()) == QMessageBox.YesRole:
 			try:
 				ll = LocationProvider().get_ll(self.venue)
-				response = checkin(self.venue, ll, self.shout_text.text())
+				response = foursquare.checkin(self.venue, ll, self.shout_text.text())
 				CheckinDetails(self, response).show()
 			except IOError:
 	 			self.ibox = QMaemo5InformationBox()
 	 			self.ibox.information(self, "Network error; check-in failed. Please try again.", 15000)
+
+class VenueDetailsThread(QThread):	
+	def __init__(self, venueId, readCache, parent):
+		super(VenueDetailsThread, self).__init__()
+		self.__parent = parent
+		self.venueId = venueId
+		self.venue = None #FIXME : get rid of this!
+		self.readCache = readCache
+		
+	def run(self):
+		try:
+			self.venue = foursquare.venues_venue(self.venueId, self.readCache)
+			self.__parent.hideWaitingDialog.emit()
+		except IOError:
+			self.__parent.hideWaitingDialog.emit()
+			self.__parent.networkError.emit()
+		self.exec_()
+		self.exit(0)
 
 class CategoryModel(QAbstractListModel):
 	def __init__(self, categories):
@@ -431,5 +547,5 @@ class NewVenueWindow(QMainWindow):
 			msgBox.setWindowTitle("Venue added")
 			msgBox.exec_()
 
-			v = VenueDetailsWindow(self, response[u'response'][u'venue'])
+			v = VenueDetailsWindow(self, response[u'response'][u'venue'], True)
 			v.show()
