@@ -24,41 +24,9 @@ import foursquare_auth
 from venue_widgets import *
 import foursquare
 from foursquare import Cache
-from locationProviders import *
-from threads import VenueProviderThread, UserUpdaterThread, ImageCacheThread
+from locationProviders import LocationProviderSelector, LocationProvider
+from threads import VenueProviderThread, UserUpdaterThread, ImageCacheThread, UpdateSelf
 from custom_widgets import SignalEmittingValueButton, WaitingDialog
-
-class LocationProviderModel(QAbstractListModel):
-	def __init__(self):
-		super(LocationProviderModel, self).__init__()
-		self.__locationProviders = LocationProvider()
-		self.__locationProviders.init()
-
-	def rowCount(self, role=Qt.DisplayRole):
-		return self.__locationProviders.len()
-
-	LocationProviderRole = 54351385
-
-	def data(self, index, role=Qt.DisplayRole):
-		lp = self.__locationProviders.get(index.row())
-		if role == Qt.DisplayRole:
-			return lp.get_name()
-		if role == LocationProviderModel.LocationProviderRole:
-			return lp
-
-class LocationProviderSelector(QMaemo5ListPickSelector):
-	def __init__(self):
-		super(LocationProviderSelector, self).__init__()
-		self.setModel(LocationProviderModel())
-		
-		# This restores the last selected provider
-		previousIndex = foursquare.config_get("locationProvider");
-		if not previousIndex:
-			previousIndex = 0
-		else:
-			previousIndex = int(previousIndex)
-		self.setCurrentIndex(previousIndex)
-		LocationProvider().select(previousIndex)
 
 class UserListModel(QAbstractListModel):
 	def __init__(self, users):
@@ -147,31 +115,53 @@ class UserListWindow(QMainWindow):
 class Profile(QWidget):
 	def __init__(self, parent = None):
 		super(Profile, self).__init__(parent)
-		user = foursquare.get_user("self", Cache.CacheOrGet)[u'user']
-		photo = QImage(foursquare.image(user[u'photo']))
+		self.user = foursquare.get_user("self", Cache.CacheOrGet)[u'user']
+		photo = QImage(foursquare.image(self.user[u'photo']))
 		photo_label = QLabel()
 		photo_label.setPixmap(QPixmap(photo))
 
-		name = "<b>"
-		if u'firstName' in user:
-			name += user[u'firstName'] + " "
-		if u'lastName' in user:
-			name += user[u'lastName']
-		name += "</b>"
-
-		badges = str(user[u'badges'][u'count']) + " badges"
-		mayorships = str(user[u'mayorships'][u'count']) + " mayorships"
-		checkins = str(user[u'checkins'][u'count']) + " checkins"
-
-		text = name + "<p>" + badges + "<br>" + mayorships + "<br>" + checkins 
+		self.textLabel = QLabel()
+		self.__updateInfo(True)
 
 		profileLayout = QGridLayout()
 		self.setLayout(profileLayout)
 		profileLayout.addWidget(photo_label, 0, 0)
-		profileLayout.addWidget(QLabel(text), 0, 1, 1, 2)
+		profileLayout.addWidget(self.textLabel, 0, 1, 1, 2)
 
-	def mousePressEvent(self):
-		print "I've been clicked!!!"
+		clicked = Signal()
+		self.connect(self, SIGNAL("clicked()"), self.__clicked)
+
+		selfUpdated = Signal()
+		self.connect(self, SIGNAL("selfUpdated()"), self.__updateInfo)
+		# networkError = Signal()
+
+	# def __networkError
+
+	def __clicked(self):
+		t = UpdateSelf(self)
+		t.start()
+		QMaemo5InformationBox.information(self, "Updating info...", 1500)
+
+	def mousePressEvent(self, event):
+		self.clicked.emit()
+
+	def __updateInfo(self, initial = False):
+		if not initial:
+			QMaemo5InformationBox.information(self, "Info updated!", 1500)
+		name = "<b>"
+		if u'firstName' in self.user:
+			name += self.user[u'firstName'] + " "
+		if u'lastName' in self.user:
+			name += self.user[u'lastName']
+		name += "</b>"
+
+		badges = str(self.user[u'badges'][u'count']) + " badges"
+		mayorships = str(self.user[u'mayorships'][u'count']) + " mayorships"
+		checkins = str(self.user[u'checkins'][u'count']) + " checkins"
+
+		text = name + "<p>" + badges + "<br>" + mayorships + "<br>" + checkins
+
+		self.textLabel.setText(text)
 
 class MainWindow(QMainWindow):
 

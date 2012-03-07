@@ -12,13 +12,42 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-try:
-	import location
-except ImportError:
-	print "Couldn't import location. You're probably not running maemo."
-	print "GPS Support disabled."
-
+import location
 import foursquare
+from PySide.QtCore import QAbstractListModel, Qt
+from PySide.QtMaemo5 import QMaemo5ListPickSelector
+
+class LocationProviderModel(QAbstractListModel):
+	def __init__(self):
+		super(LocationProviderModel, self).__init__()
+		self.__locationProviders = LocationProvider()
+		self.__locationProviders.init()
+
+	def rowCount(self, role=Qt.DisplayRole):
+		return self.__locationProviders.len()
+
+	LocationProviderRole = 54351385
+
+	def data(self, index, role=Qt.DisplayRole):
+		lp = self.__locationProviders.get(index.row())
+		if role == Qt.DisplayRole:
+			return lp.get_name()
+		if role == LocationProviderModel.LocationProviderRole:
+			return lp
+
+class LocationProviderSelector(QMaemo5ListPickSelector):
+	def __init__(self):
+		super(LocationProviderSelector, self).__init__()
+		self.setModel(LocationProviderModel())
+		
+		# This restores the last selected provider
+		previousIndex = foursquare.config_get("locationProvider");
+		if not previousIndex:
+			previousIndex = 0
+		else:
+			previousIndex = int(previousIndex)
+		self.setCurrentIndex(previousIndex)
+		LocationProvider().select(previousIndex)
 
 class LocationProvider:
 	"""
