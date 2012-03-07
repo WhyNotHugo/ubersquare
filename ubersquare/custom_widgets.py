@@ -12,6 +12,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from PySide.QtGui import QDialog, QVBoxLayout, QLabel
 from PySide.QtMaemo5 import QMaemo5ValueButton
 
 class SignalEmittingValueButton(QMaemo5ValueButton):
@@ -22,3 +23,11 @@ class SignalEmittingValueButton(QMaemo5ValueButton):
 	def setValueText(self, text):
 		super(SignalEmittingValueButton, self).setValueText(text)
 		self.callback(self.pickSelector().currentIndex())
+
+class WaitingDialog(QDialog):
+	def __init__(self, parent = None):
+		super(WaitingDialog, self).__init__(parent)
+		layout = QVBoxLayout()
+		layout.addWidget(QLabel("Please wait; fetching data from foursquare..."))
+		self.setLayout(layout)
+		self.setWindowTitle("Please wait")

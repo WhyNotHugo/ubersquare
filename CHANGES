@@ -1,0 +1,12 @@
+0.3.0
+* Fixed random crashes when opening venue lists and the leaderboard
++ Added some "waiting dialogs" (some still missing)
++ Added an icon
++ Implemented the "about" screen (since a disclaimer need to be shown in order to use the foursquare logo)
++ Tips are now shown and can be marked as todo or done
+- The "add tip" button does not work yet
+0.3.1
+* Fixed some packaging issues
+0.3.2
+* Fixed an issue where the list of duplicates was not shown when creating a new venue
+* Fixed an issue where the newly created venue was not shown when creating a new venue

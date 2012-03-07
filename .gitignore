@@ -3,3 +3,8 @@
 cache.sqlite
 build
 dist
+.py2deb_build_folder/
+package/
+ubersquare_*.changes
+ubersquare_*.dsc
+ubersquare_*.tar.gz
