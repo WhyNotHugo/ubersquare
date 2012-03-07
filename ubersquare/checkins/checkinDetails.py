@@ -38,7 +38,8 @@ class CheckinDetails(QDialog):
 			elif item[u'type'] == "mayorship":
 				mayorship = item[u'item'][u'message']
 			elif item[u'type'] == "badge":
-				badge = "<p>" + item[u'item'][u'message']
+				print json.dumps(item[u'item'], sort_keys=True, indent=4)
+				badge = "You got the \"" + item[u'item'][u'name'] + "\" badge!"
 
 		text = message + score + mayorship + badge
 

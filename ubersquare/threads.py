@@ -96,3 +96,17 @@ class TipMarkTodoBackgroundThread(QThread):
 			self.parentWindow.networkError.emit()
 		self.exec_()
 		self.exit(0)
+
+class UpdateSelf(QThread):
+	def __init__(self, parent):
+		super(UpdateSelf, self).__init__(parent)
+		self.__parent = parent
+
+	def run(self):
+		try:
+			foursquare.get_user("self", Cache.ForceFetch)
+			self.__parent.selfUpdated.emit()
+		except IOError:
+			self.__parent.networkError.emit()
+		self.exec_()
+		self.exit(0)

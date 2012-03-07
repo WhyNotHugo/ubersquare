@@ -38,8 +38,6 @@ cache_dir = os.path.join(BaseDirectory.xdg_cache_home, "ubersquare/")
 image_dir = os.path.join(BaseDirectory.xdg_data_home, "ubersquare/images/")
 config_dir = os.path.join(BaseDirectory.xdg_config_home, "ubersquare/")
 
-print "running devel engine!"
-
 if not os.path.exists(cache_dir):
 	os.makedirs(cache_dir)
 if not os.path.exists(image_dir):
@@ -61,11 +59,10 @@ if not os.path.exists(config):
 	conn.close()
 
 def debug(string):
-	if (DEBUG):
-		print string
+	print string
 
 def debug_json(string):
-	debug(json.dumps(string, sort_keys=True, indent=4))
+	print json.dumps(string, sort_keys=True, indent=4)
 
 ####################
 # CACHE/FOURSQUARE #
