@@ -12,6 +12,11 @@ import shutil
 fakeargs = [sys.argv[0], "build", "bdist_dumb"]
 sys.argv = fakeargs
 
+try:
+	os.chdir(os.path.dirname(sys.argv[0]))
+except:
+	pass
+
 setup(name='ubersquare',
       version=os.environ["VERSION"],
       description='A foursquare client for maemo',
@@ -22,19 +27,11 @@ setup(name='ubersquare',
       license='BSD'
 )
 
-print " * Deleting old files from package dir"
 shutil.rmtree("package/usr/lib")
-print " * unpacking new python modules into package dir"
 call(["tar", "-C", "package/", "-xzf", "dist/ubersquare-" + VERSION + ".linux-armv7l.tar.gz"])
-print " * deleting build/ and dist/"
-
 shutil.rmtree("build")
 shutil.rmtree("dist")
 
-try:
-	os.chdir(os.path.dirname(sys.argv[0]))
-except:
-	pass
 print
 p=py2deb.Py2deb("ubersquare")
 p.description="A foursquare client for maemo."

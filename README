@@ -1,0 +1,3 @@
+Run "python make.py" to prepare the file necessary to build a package.
+
+You'll need to submit the 3 resulting files to the extras-devel autobuilder, or use a Debian-based machine in order to compile it (I've never done the latter, consult the wiki will help).
