@@ -18,9 +18,8 @@ from PySide.QtGui import *
 import sys
 import foursquare
 from foursquare import Cache
-from gui import WaitingDialog
 from locationProviders import LocationProvider
-from custom_widgets import SignalEmittingValueButton
+from custom_widgets import SignalEmittingValueButton, WaitingDialog
 from threads import TipMarkTodoBackgroundThread, TipMarkDoneBackgroundThread
 import time
 
@@ -333,12 +332,15 @@ class VenueDetailsWindow(QMainWindow):
 			gridLayout.addWidget(websiteButton, i, 1)
 
 		if u'mayor' in venue:
-			mayorName = venue[u'mayor'][u'user'][u'firstName']
-			mayorCount = venue[u'mayor'][u'count']
-			mayorText = mayorName + " is the mayor with " + str(mayorCount) + " checkins!"
-			mayorButton = QPushButton()
-			mayorButton.setText(mayorText)
-			mayorButton.setIcon(QIcon(foursquare.image(venue[u'mayor'][u'user'][u'photo'])))
+			if u'user' in venue[u'mayor']:
+				mayorName = venue[u'mayor'][u'user'][u'firstName']
+				mayorCount = venue[u'mayor'][u'count']
+				mayorText = mayorName + " is the mayor with " + str(mayorCount) + " checkins!"
+				mayorButton = QPushButton()
+				mayorButton.setText(mayorText)
+				mayorButton.setIcon(QIcon(foursquare.image(venue[u'mayor'][u'user'][u'photo'])))
+			else:
+				mayorButton = QLabel("This venue has no mayor")
 			i += 1
 			gridLayout.addWidget(mayorButton, i, 0, 1, 2, Qt.AlignHCenter)
 
@@ -366,7 +368,6 @@ class VenueDetailsWindow(QMainWindow):
 
 			i += 1
 			gridLayout.addWidget(NewTipWidget(venue[u'id']), i, 0, 1 ,2)
-
 
 		if not fullDetails:
 			info_button_label = "More details (plus tips and stuff)"
@@ -436,8 +437,9 @@ class VenueDetailsThread(QThread):
 		try:
 			venue = foursquare.venues_venue(self.venueId, Cache.ForceFetch)
 			if u'mayor' in venue:
-				print "there's a mayor!"
-				foursquare.image(venue[u'mayor'][u'user'][u'photo'])
+				if u'user' in venue[u'mayor']:
+					print "there's a mayor!"
+					foursquare.image(venue[u'mayor'][u'user'][u'photo'])
 			self.__parent.hideWaitingDialog.emit()
 			# This tiny sleep in necesary to (a) Avoid an Xorg warning, (b) achieve a smoother transition
 			time.sleep(0.15)
@@ -622,7 +624,7 @@ class NewVenueWindow(QMainWindow):
 			self.venue['ignoreDuplicates'] = "true"
 			self.venue['ignoreDuplicatesKey'] = response[u'response'][u'ignoreDuplicatesKey']
 
-			w = VenueListWindow(self, "Posible matches", venues)
+			w = VenueListWindow("Posible matches", venues, self)
 			w.show()
 		else:
 			msgBox = QMessageBox(self)

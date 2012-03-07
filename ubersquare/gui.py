@@ -26,15 +26,7 @@ import foursquare
 from foursquare import Cache
 from locationProviders import *
 from threads import VenueProviderThread, UserUpdaterThread, ImageCacheThread
-from custom_widgets import SignalEmittingValueButton
-
-class WaitingDialog(QDialog):
-	def __init__(self, parent = None):
-		super(WaitingDialog, self).__init__(parent)
-		layout = QVBoxLayout()
-		layout.addWidget(QLabel("Please wait; fetching data from foursquare..."))
-		self.setLayout(layout)
-		self.setWindowTitle("Please wait")
+from custom_widgets import SignalEmittingValueButton, WaitingDialog
 
 class LocationProviderModel(QAbstractListModel):
 	def __init__(self):

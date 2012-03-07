@@ -54,7 +54,7 @@ class UserUpdaterThread(QThread):
 
 class ImageCacheThread(QThread):	
 	def __init__(self, parent):
-		super(ImageCacheThread, self).__init__()
+		super(ImageCacheThread, self).__init__(parent)
 		self.__parent = parent
 		
 	def run(self):
