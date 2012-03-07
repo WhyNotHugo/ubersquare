@@ -170,6 +170,9 @@ class Profile(QWidget):
 		profileLayout.addWidget(photo_label, 0, 0)
 		profileLayout.addWidget(QLabel(text), 0, 1, 1, 2)
 
+	def mousePressEvent(self):
+		print "I've been clicked!!!"
+
 class MainWindow(QMainWindow):
 
 	def __init__(self):
