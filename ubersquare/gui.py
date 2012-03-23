@@ -20,113 +20,32 @@ from PySide.QtGui import *
 
 from PySide.QtMaemo5 import QMaemo5ListPickSelector, QMaemo5ValueButton, QMaemo5InformationBox
 
-import foursquare_auth
-from venue_widgets import *
 import foursquare
+import foursquare_auth
+from venues import NewVenueWindow
+from venues import *
 from foursquare import Cache
 from locationProviders import LocationProviderSelector, LocationProvider
 from threads import VenueProviderThread, UserUpdaterThread, ImageCacheThread, UpdateSelf
-from custom_widgets import SignalEmittingValueButton, WaitingDialog
-
-class UserListModel(QAbstractListModel):
-	def __init__(self, users):
-		super(UserListModel, self).__init__()
-		self.users = users
-
-	UserRole = 54514533
-
-	def rowCount(self, role=Qt.DisplayRole):
-		return len(self.users)
-
-	def data(self, index, role=Qt.DisplayRole):
-		user = self.users[index.row()][u'user']
-		if role == Qt.DisplayRole:
-			text = user[u'firstName']
-			if u'lastName' in user:
-				text += " " + user[u'lastName']
-			score = self.users[index.row()][u'scores']
-			text += "\n  " + str(score[u'recent']) + "/" + str(score[u'max']) + " (" + str(score[u'checkinsCount']) + " checkins" + ")"
-			return text
-		elif role == Qt.DecorationRole:
-			return QIcon(foursquare.image(user[u'photo']))
-		elif role == UserListModel.UserRole:
-			return user
-
-	def setUsers(self, users):
-		self.users = users
-		self.reset()
-
-class UserList(QListView):
-	def __init__(self, users, parent):
-		super(UserList,self).__init__(parent)
-		self.model = UserListModel(users)
-		self.setModel(self.model)
-		self.clicked.connect(self.user_selected)
-		self.adjustSize()
-
-	def user_selected(self, index):
-		# d = VenueDetailsWindow(self, self.proxy.data(index,VenueModel.VenueRole))
-		# d.show()
-		pass
-
-	def setUsers(self, users):
-		self.model.setUsers(users)
-
-class UserListWindow(QMainWindow):
-	def __init__(self, title, users, parent):
-		super(UserListWindow, self).__init__(parent)
-		self.setAttribute(Qt.WA_Maemo5StackedWindow)
-
-		self.setWindowTitle(title)
-
-		self.cw = QWidget(self)
-		self.setCentralWidget(self.cw)
-
-		layout = QVBoxLayout(self.cw)
-
-		self.text_field = QLineEdit(self)
-		self.text_field.setPlaceholderText("Type to filter")
-		self.list = UserList(users, self)
-
-		self.text_field.textChanged.connect(self.filter)
-
-		layout.addWidget(self.text_field)
-		layout.addWidget(self.list)
-
-		updateUsers = Signal()
-		self.connect(self, SIGNAL("updateUsers()"), self._updateUsers)
-		self.shown = False
-
-	def show(self):
-		super(UserListWindow, self).show()
-		self.shown = True
-
-	def _updateUsers(self):
-		self.setUsers(self.parent().users())
-		if not self.shown:
-			self.show()
-
-	def filter(self, text):
-		self.list.filter(text)
-
-	def setUsers(self, users):
-		self.list.setUsers(users)
+from custom_widgets import SignalEmittingValueButton, WaitingDialog, CategorySelector, UberSquareWindow
+from users import UserListModel, UserList, UserListWindow
+from about import AboutDialog
 
 class Profile(QWidget):
 	def __init__(self, parent = None):
 		super(Profile, self).__init__(parent)
 		self.user = foursquare.get_user("self", Cache.CacheOrGet)[u'user']
-		photo = QImage(foursquare.image(self.user[u'photo']))
-		photo_label = QLabel()
-		photo_label.setPixmap(QPixmap(photo))
+		self.photo_label = QLabel()
 
 		self.textLabel = QLabel()
 		self.__updateInfo(True)
 
 		profileLayout = QGridLayout()
 		self.setLayout(profileLayout)
-		profileLayout.addWidget(photo_label, 0, 0)
+		profileLayout.addWidget(self.photo_label, 0, 0)
 		profileLayout.addWidget(self.textLabel, 0, 1, 1, 2)
+
+		#profileLayout.addWidget(QLabel("current user location"), 1, 0, 1, 3)
 
 		clicked = Signal()
 		self.connect(self, SIGNAL("clicked()"), self.__clicked)
@@ -140,14 +59,14 @@ class Profile(QWidget):
 	def __clicked(self):
 		t = UpdateSelf(self)
 		t.start()
-		QMaemo5InformationBox.information(self, "Updating info...", 1500)
+		QMaemo5InformationBox.information(self, "Updating stats...", 1500)
 
 	def mousePressEvent(self, event):
 		self.clicked.emit()
 
 	def __updateInfo(self, initial = False):
 		if not initial:
-			QMaemo5InformationBox.information(self, "Info updated!", 1500)
+			QMaemo5InformationBox.information(self, "Stats updated!", 1500)
 		name = "<b>"
 		if u'firstName' in self.user:
 			name += self.user[u'firstName'] + " "
@@ -160,18 +79,18 @@ class Profile(QWidget):
 		checkins = str(self.user[u'checkins'][u'count']) + " checkins"
 
 		text = name + "<p>" + badges + "<br>" + mayorships + "<br>" + checkins
-
 		self.textLabel.setText(text)
 
-class MainWindow(QMainWindow):
+		self.photo = QImage(foursquare.image(self.user[u'photo']))
+		self.photo_label.setPixmap(QPixmap(self.photo))
 
+class MainWindow(UberSquareWindow):
 	def __init__(self):
 		super(MainWindow, self).__init__(None)
-		self.setAttribute(Qt.WA_Maemo5StackedWindow)
 		self.setWindowTitle("UberSquare")
 
 		self.centralWidget = QWidget() 
-		self.setCentralWidget(self.centralWidget) 
+		self.setCentralWidget(self.centralWidget)
 
 		#Main Layout 
 		layout = QVBoxLayout() 
@@ -240,19 +159,8 @@ class MainWindow(QMainWindow):
 		self.setupMenu()
 		self._venues = None
 
-		networkError = Signal()
-		self.connect(self, SIGNAL("networkError()"), self.__networkError)
-
 		showSearchResults = Signal()
 		self.connect(self, SIGNAL("showSearchResults()"), self.__showSearchResults)
-
-		hideWaitingDialog = Signal()
-		self.connect(self, SIGNAL("hideWaitingDialog()"), self.__hideWaitingDialog)
-
-		showWaitingDialog = Signal()
-		self.connect(self, SIGNAL("showWaitingDialog()"), self.__showWaitingDialog)
-
-		self.waitDialog = WaitingDialog(self)
 
 	def imageCache_pushed(self):
 		c = QMessageBox(self)
@@ -269,20 +177,6 @@ class MainWindow(QMainWindow):
 			self.waitDialog.setWindowTitle("Please wait...")
 			self.waitDialog.setText("This dialog will auto-close once downloading finishes.")
 			self.waitDialog.exec_()
-
-	def __showWaitingDialog(self):
-		self.waitDialog.show()
-
-	def __hideWaitingDialog(self):
-		self.waitDialog.hide()
-
-	def __networkError(self):
-		self.waitDialog.hide()
-		d = QMessageBox()
-		d.setWindowTitle("Network Error")
-		d.setText("I couldn't connect to foursquare to retrieve data. Make sure you're connected to the internet, and try again (keep in mind that it may have been just a network glitch).")
-		d.addButton( "Ok", QMessageBox.YesRole)
-		d.exec_()
 
 	def __showSearchResults(self):
 		self.progressDialog().close()
@@ -314,74 +208,7 @@ class MainWindow(QMainWindow):
 		menubar.addAction(about)
 
 	def __showAbout(self):
-		title = "About UberSquare"
-		aboutText = """
-UberSquare is a foursquare for maemo, specifically, for the Nokia N900.  Be sure to report any bugs you may find, and feel free to email me if you have any suggestions, etc.
-"""
-
-		bsdLicense = """
-Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
-
-Permission to use, copy, modify, and distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-"""
-		foursquareDisclaimer = """
-This application uses the foursquare(r) application programming interface but is not endorsed or certified by Foursquare Labs, Inc.  All of the foursquare(r) logos (including all badges) and trademarks displayed on this application are the property of Foursquare Labs, Inc.
-"""
-
-		dialog = QDialog()
-		dialog.setWindowTitle(title)
-		dialog.centralWidget = QWidget() 
-
-		#Main Layout 
-		layout = QVBoxLayout() 
-		layout.setSpacing(0)         
-		dialog.setLayout(layout) 
-
-		#Content Layout 
-		self.container = QWidget() 
-
-		self.scrollArea = QScrollArea() 
-		self.scrollArea.setWidget(self.container)           
-
-		layout.addWidget(self.scrollArea)   
-
-		self.scrollArea.setWidgetResizable(True)
-
-		gridLayout = QGridLayout() 
-		self.container.setLayout(gridLayout) 
-
-		aboutTextLabel = QLabel(aboutText)
-		aboutTextLabel.setWordWrap(True)
-
-		bsdLicenseLabel = QLabel(bsdLicense)
-		bsdLicenseLabel.setWordWrap(True)
-
-		foursquareDisclaimerLabel = QLabel(foursquareDisclaimer)
-		foursquareDisclaimerLabel.setWordWrap(True)
-
-		gridLayout.addWidget(aboutTextLabel, 0, 0)
-		line = QFrame()
-		line.setFrameShape(QFrame.HLine)
-		line.setMaximumWidth(QApplication.desktop().screenGeometry().width() * 0.5)
-		gridLayout.addWidget(line, 1, 0)
-
-		gridLayout.addWidget(bsdLicenseLabel, 2, 0)
-		line = QFrame()
-		line.setFrameShape(QFrame.HLine)
-		line.setMaximumWidth(QApplication.desktop().screenGeometry().width() * 0.5)
-		gridLayout.addWidget(line, 3, 0)
-
-		gridLayout.addWidget(foursquareDisclaimerLabel, 4, 0)
-		line = QFrame()
-		line.setFrameShape(QFrame.HLine)
-		line.setMaximumWidth(QApplication.desktop().screenGeometry().width() * 0.5)
-		gridLayout.addWidget(line, 5, 0)
-
-		gridLayout.addWidget(QLabel("TODO: Insert \"powered by foursquare\" image here."), 6, 0)
-
-		dialog.exec_()
+		AboutDialog().exec_()
 
 	def leaderboard_button_pushed(self):
 		users = foursquare.users_leaderboard(foursquare.CacheOrNull)
@@ -391,7 +218,7 @@ This application uses the foursquare(r) application programming interface but is
 		if users:
 			w.show()
 		else:
-			self.__showWaitingDialog()
+			self.showWaitingDialog.emit()
 
 	def logout_pushed(self):
 		config_del("code")
@@ -410,7 +237,7 @@ This application uses the foursquare(r) application programming interface but is
 		if venues:
 			w.show()
 		else:
-			self.__showWaitingDialog()
+			self.showWaitingDialog.emit()
 
 	def todo_venues_pushed(self):
 		try:
@@ -421,22 +248,42 @@ This application uses the foursquare(r) application programming interface but is
 			if venues:
 				w.show()
 			else:
-				self.__showWaitingDialog()
+				self.showWaitingDialog.emit()
 		except IOError:
 			self.networkError.emit()
 
 	def search_venues_pushed(self):
-		d = QInputDialog(self)
-		d.setInputMode(QInputDialog.TextInput)
-		d.setLabelText("What do you want to search for?\n(Leave blank to explore)")
-		d.setOkButtonText("Search")
-		d.setWindowTitle("Search")
-		if d.exec_() == 1:
-			try:
-				win = VenueListWindow("Search results", foursquare.venues_search(d.textValue(), LocationProvider().get_ll()), self)
-				win.show()
-			except IOError:
-				self.networkError.emit()
+		dialog = QDialog(self)
+		dialog.setWindowTitle("Search")
+		dialog.centralWidget = QWidget() 
+
+		#Main Layout 
+		layout = QGridLayout() 
+		#layout.setSpacing(0)
+		dialog.setLayout(layout)
+
+		self.searchQuery = QLineEdit(self)
+		self.searchQuery.setPlaceholderText("Search query")
+
+		button = QPushButton("Search")
+		self.connect(button, SIGNAL("clicked()"), dialog.accept)
+
+		categorySelector = CategorySelector()
+
+		layout.addWidget(categorySelector, 0, 0)
+		layout.addWidget(self.searchQuery, 1, 0)
+		layout.addWidget(button, 1, 1)
+		
+		dialog.exec_()
+
+		if (dialog.result() == QDialog.Accepted):
+			categoryId = categorySelector.selectedCategory()
+
+		 	try:
+		 		win = VenueListWindow("Search results", foursquare.venues_search(self.searchQuery.text(), LocationProvider().get_ll(), categoryId), self)
+		 		win.show()
+		 	except IOError:
+		 		self.networkError.emit()
 
 	def locationSelected(self, index):
 		LocationProvider().select(index)

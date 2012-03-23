@@ -1,6 +1,6 @@
 #!/usr/bin/python2.5
 # -*- coding: utf-8 -*-
-VERSION="0.3.2"
+VERSION="0.3.3"
 
 from distutils.core import setup
 from subprocess import call
@@ -18,7 +18,7 @@ except:
 	pass
 
 setup(name='ubersquare',
-      version=os.environ["VERSION"],
+      version=VERSION,
       description='A foursquare client for maemo',
       url='http://ubertech.com.ar/square',
       author='Hugo Osvaldo Barrera',
@@ -46,7 +46,7 @@ p.urgency="low"
 p.distribution="fremantle"
 p.repository="extras-devel"
 p.xsbc_bugtracker="http://bugs.maemo.org"
-version = os.environ["VERSION"]
+version = VERSION
 build = "1"
 changeloginformation = open("CHANGES").read() 
 dir_name = "package"

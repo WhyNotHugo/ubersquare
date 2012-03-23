@@ -12,15 +12,15 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-from PySide.QtCore import *
 #from PySide.QtGui import QDesktopServices
+from PySide.QtCore import *
 from PySide.QtGui import *
 import sys
 import foursquare
 from foursquare import Cache
 from locationProviders import LocationProvider
-from custom_widgets import SignalEmittingValueButton, WaitingDialog
-from threads import TipMarkTodoBackgroundThread, TipMarkDoneBackgroundThread
+from custom_widgets import SignalEmittingValueButton, WaitingDialog, CategorySelector, UberSquareWindow
+from threads import TipMarkTodoBackgroundThread, TipMarkDoneBackgroundThread, LeaveTipThread
 import time
 
 try:
@@ -29,8 +29,7 @@ try:
 except ImportError:
 	maemo = False
 
-from checkins import CheckinConfirmation
-from checkins import CheckinDetails
+from checkins import CheckinConfirmation, CheckinDetails
 		
 class VenueListModel(QAbstractListModel):
 	def __init__(self, venues):
@@ -40,7 +39,10 @@ class VenueListModel(QAbstractListModel):
 	VenueRole = 849561745
 
 	def rowCount(self, role=Qt.DisplayRole):
-		return len(self.venues)
+		if self.venues:
+			return len(self.venues)
+		else:
+			return 0
 
 	def data(self, index, role=Qt.DisplayRole):
 		venue = self.venues[index.row()][u'venue']
@@ -182,6 +184,7 @@ class Tip(QWidget):
 class NewTipWidget(QWidget):
 	def __init__(self, venueId, parent = None):
 		super(NewTipWidget, self).__init__(parent)
+		self.__parent = parent
 
 		gridLayout = QGridLayout() 
 		self.setLayout(gridLayout) 
@@ -191,18 +194,24 @@ class NewTipWidget(QWidget):
 		self.tip_text.setPlaceholderText("Write something and then...")
 		gridLayout.addWidget(self.tip_text, 0, 0)
 
-		self.tip_button = QPushButton("TODO: Leave tip!")
+		self.tip_button = QPushButton("Leave tip!")
 		self.tip_button.clicked.connect(self.addTip)
 		gridLayout.addWidget(self.tip_button, 0, 1)
 
 	def addTip(self):
-		# TODO: add tip self.tip_text.text()
-		pass
+		t = LeaveTipThread(self.venueId, self.tip_text.text(), self.__parent)
+		t.start()
+		self.__parent.showWaitingDialog.emit()
 
-class VenueDetailsWindow(QMainWindow):
+class Ruler(QFrame):
+	def __init__(self):
+		super(Ruler, self).__init__()
+		self.setFrameShape(QFrame.HLine)
+		self.setStyleSheet("QFrame { background-color: #313131; color: #313131; height: 2px; }")
+
+class VenueDetailsWindow(UberSquareWindow):
 	def __init__(self, parent, venue, fullDetails):
 		super(VenueDetailsWindow, self).__init__(parent)
-		self.setAttribute(Qt.WA_Maemo5StackedWindow)
 		self.venue = venue
 
 		self.fullDetails = fullDetails
@@ -214,6 +223,7 @@ class VenueDetailsWindow(QMainWindow):
 
 		layout = QVBoxLayout() 
 		layout.setSpacing(0)         
+		layout.setContentsMargins(11,11,11,11)
 		self.centralWidget.setLayout(layout) 
 
 		self.container = QWidget()
@@ -230,7 +240,7 @@ class VenueDetailsWindow(QMainWindow):
 		self.container.setLayout(gridLayout) 
 
 		# name
-		name = "<b>" + venue[u'name'] + "</b>"
+		name = venue[u'name']
 		if len(venue[u'categories']) > 0:
 			name += " (" + venue[u'categories'][0][u'name'] + ")"
 
@@ -273,13 +283,14 @@ class VenueDetailsWindow(QMainWindow):
 		self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
 
 		i = 0
-		gridLayout.addWidget(checkin_button, i, 0, 1, 2)
-		i += 1
+		gridLayout.addWidget(checkin_button, i, 1)
 		self.shout_text = QLineEdit(self)
-		self.shout_text.setPlaceholderText("Shout")
-		gridLayout.addWidget(self.shout_text, i, 0, 1, 2)
+		self.shout_text.setPlaceholderText("Shout something")
+		gridLayout.addWidget(self.shout_text, i, 0)
 		i += 1
-		gridLayout.addWidget(QLabel(name, self), i, 0, 1 ,2)
+		nameLabel = QLabel(name, self)
+		nameLabel.setStyleSheet("QLabel { color: #999999; font-size: 36px; }")
+		gridLayout.addWidget(nameLabel, i, 0, 1 ,2)
 		i += 1
 		gridLayout.addWidget(QLabel(address, self), i, 0, 1 ,2)
 		i += 1
@@ -289,9 +300,7 @@ class VenueDetailsWindow(QMainWindow):
 				i += 1
 				gridLayout.addWidget(QLabel(item[u'name'], self), i, 0, 1, 2)
 		i += 1
-		line = QFrame()
-		line.setFrameShape(QFrame.HLine)
-		gridLayout.addWidget(line, i, 0, 1, 2)
+		gridLayout.addWidget(Ruler(), i, 0, 1, 2)
 
 		if u'description' in venue:
 			i += 1
@@ -305,7 +314,8 @@ class VenueDetailsWindow(QMainWindow):
 		gridLayout.addWidget(QLabel(times, self), i, 0)
 		i += 1
 		gridLayout.addWidget(QLabel("Total Checkins: " + str(venue[u'stats'][u'checkinsCount']), self), i, 0)
-		gridLayout.addWidget(QLabel("Total Visitors: " + str(venue[u'stats'][u'usersCount']), self), i, 1)
+		i += 1
+		gridLayout.addWidget(QLabel("Total Visitors: " + str(venue[u'stats'][u'usersCount']), self), i, 0)
 
 		if u'hereNow' in venue:
 			hereNow = venue[u'hereNow'][u'count']
@@ -367,28 +377,20 @@ class VenueDetailsWindow(QMainWindow):
 						gridLayout.addWidget(line, i, 0, 1, 2)
 
 			i += 1
-			gridLayout.addWidget(NewTipWidget(venue[u'id']), i, 0, 1 ,2)
+			gridLayout.addWidget(NewTipWidget(venue[u'id'], self), i, 0, 1 ,2)
 
 		if not fullDetails:
-			info_button_label = "More details (plus tips and stuff)"
+			info_button_label = "Fetch tips and details"
 		else:
-			info_button_label = "Force refresh (updates cached data)"
+			info_button_label = "Force update info"
 		more_info_button = QPushButton(info_button_label)
 		self.connect(more_info_button, SIGNAL("clicked()"), self.more_info)
 
 		i += 1
 		gridLayout.addWidget(more_info_button, i, 0, 1, 2)
 
-		hideWaitingDialog = Signal()
-		self.connect(self, SIGNAL("hideWaitingDialog()"), self.__hideWaitingDialog)
-
-		showWaitingDialog = Signal()
-		self.connect(self, SIGNAL("showWaitingDialog()"), self.__showWaitingDialog)
-
 		showMoreInfo = Signal()
 		self.connect(self, SIGNAL("showMoreInfo()"), self.more_info)
-
-		self.waitDialog = WaitingDialog(self)
 
 	def startPhoneCall(self):
 		QDesktopServices.openUrl("tel:" + self.venue[u'contact']['phone'])
@@ -449,33 +451,6 @@ class VenueDetailsThread(QThread):
 			self.__parent.networkError.emit()
 		self.exec_()
 		self.exit(0)
-
-class CategoryModel(QAbstractListModel):
-	def __init__(self, categories):
-		super(CategoryModel, self).__init__()
-		self.categories = categories
-
-	def rowCount(self, role=Qt.DisplayRole):
-		return len(self.categories)
-
-	CategoryRole = 983488936
-	SubCategoriesRole = 235246646
-
-	def data(self, index, role=Qt.DisplayRole):
-		if role == Qt.DisplayRole:
-			return self.categories[index.row()][u'name']
-		if role == CategoryModel.CategoryRole:
-			return self.categories[index.row()]
-		if role == CategoryModel.SubCategoriesRole:
-			return self.categories[index.row()][u'categories']
-
-	def get_data(self, index):
-		return self.categories[index]
-
-class CategorySelector(QMaemo5ListPickSelector):
-	def __init__(self, categories):
-		super(CategorySelector, self).__init__()
-		self.setModel(CategoryModel(categories))
 
 class NewVenueWindow(QMainWindow):
 	def __init__(self, parent, categories, ll):
@@ -550,15 +525,9 @@ class NewVenueWindow(QMainWindow):
 		gridLayout.addWidget(self.description, i, 0, 1, 2)
 
 		i += 1
-		self.category = SignalEmittingValueButton("Category", self.category_selected, self)
-		gridLayout.addWidget(self.category, i, 0, 1, 2)
-		self.category.setPickSelector(CategorySelector(categories))
-		self.category.setValueLayout(QMaemo5ValueButton.ValueBesideText)
-
+		self.category = CategorySelector(self)
+		gridLayout.addWidget(self.category, i, 0, 2, 2)
 		i += 1
-		self.subcategory = QMaemo5ValueButton("Subcategory", self)
-		gridLayout.addWidget(self.subcategory, i, 0, 1, 2)
-		self.subcategory.setValueLayout(QMaemo5ValueButton.ValueBesideText)
 		
 		i += 1
 		self.ll = QLineEdit(self)
@@ -595,7 +564,7 @@ class NewVenueWindow(QMainWindow):
 		venue['zip'] = self.zip.text()
 		venue['phone'] = self.phone.text()
 		venue['twitter'] = self.twitter.text()
-		venue['primaryCategoryId'] = self.subcategory.pickSelector().model().get_data(self.subcategory.pickSelector().currentIndex())[u'id']
+		venue['primaryCategoryId'] = self.category.selectedCategory()
 		venue['description'] = self.description.text()
 		venue['url'] = self.url.text()
 		venue['ignoreDuplicates'] = self.venue['ignoreDuplicates']
