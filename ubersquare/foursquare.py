@@ -151,7 +151,11 @@ def foursquare_get(path, params, read_cache = False, callback = None):
 
 def foursquare_post(path, params):
 	commonParams = {'oauth_token': authData['ACCESS_TOKEN'], 'v': API_VERSION}
-	allParams = urllib.urlencode(dict(commonParams.items() + params.items()))
+	allParams = dict(commonParams.items() + params.items())
+
+	allParams = dict([k, v.encode('utf-8')] for k, v in allParams.items())
+
+	allParams = urllib.urlencode(allParams)
 
 	resource = urllib.urlopen(BASE_URL + path, allParams)
 	response = json.load(resource, "UTF-8")
@@ -202,8 +206,8 @@ def lists_todos(read_cache):
 	if response:
 		return build_venue_array(response[u'response'][u'list'][u'listItems'][u'items'])
 
-def venues_search(query, ll, limit = 25):
-	response = foursquare_get("venues/search", {'query': query, 'll': ll, 'limit': limit})
+def venues_search(query, ll, category = "", intent = "checkin", limit = 25):
+	response = foursquare_get("venues/search", {'query': query, 'll': ll, 'intent' : intent, 'categoryId' : category, 'limit': limit})
 	if response:
 		venues = dict()
 		i = 0;
@@ -280,13 +284,19 @@ def users_leaderboard(read_cache):
 		return response[u'response'][u'leaderboard'][u'items']
 
 def __delete_venue_with_tip(tipId):
-	# A nasty hack.  If a tip changes status in a venue, I uncache the venue, since
-	# the cached data is out-of-date, and manually synching this is pretty hard work
-	# This may change if future </lie>
+	"""
+	A nasty hack.  If a tip changes status in a venue, I uncache the venue, since
+	the cached data is out-of-date, and manually synching this is pretty hard work
+	This may change if future </lie>
+	"""
 	conn = sqlite3.connect(query_cache)
 	conn.execute("DELETE FROM queries WHERE value LIKE ?", ("%"+tipId+"%",))
 	conn.commit()
 	conn.close()
+
+def tip_add(venueId, text, url = "", broadcast = ""):
+	response = foursquare_post("/tips/add", {'venueId': venueId, 'text': text, 'url': url, 'broadcast': broadcast})
+	return response
 
 def tip_marktodo(tipId, marked):
 	if marked:
@@ -317,7 +327,7 @@ def fetch_category_image(category):
 			fetch_category_image(category)
 
 def init_category_icon_cache():
-	categories = get_venues_categories()
+	categories = get_venues_categories(Cache.ForceFetch)
 	for category in categories:
 		fetch_category_image(category)
 	print "done updating image cache"

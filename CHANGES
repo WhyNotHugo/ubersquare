@@ -10,3 +10,11 @@
 0.3.2
 * Fixed an issue where the list of duplicates was not shown when creating a new venue
 * Fixed an issue where the newly created venue was not shown when creating a new venue
+0.3.3
++ Touching the profile picture updates stats
+0.3.4
++ It is now possible to search using a category as a parameter
++ Heavy code improvements
++ Leaving tips now works
++ Categories have icons everywhere
++ Slightly improved venue details screen (still WIP though)

@@ -110,3 +110,20 @@ class UpdateSelf(QThread):
 			self.__parent.networkError.emit()
 		self.exec_()
 		self.exit(0)
+
+class LeaveTipThread(QThread):
+	def __init__(self, venueId, text, parent):
+		super(LeaveTipThread, self).__init__(parent)
+		self.venueId = venueId
+		self.text = text
+		self.parentWindow = parent
+	
+	def run(self):
+		try:
+			foursquare.tip_add(self.venueId, self.text)
+			self.parentWindow.hideWaitingDialog.emit()
+			self.parentWindow.showMoreInfo.emit()
+		except IOError:
+			self.parentWindow.networkError.emit()
+		self.exec_()
+		self.exit(0)
