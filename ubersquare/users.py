@@ -16,30 +16,38 @@
 
 from PySide.QtGui import QListView, QMainWindow, QWidget, QVBoxLayout, QLineEdit, QIcon, QScrollArea, QGridLayout, QLabel, QImage, QPixmap, QPushButton
 from PySide.QtCore import QAbstractListModel, Qt, Signal, SIGNAL
+from custom_widgets import UberSquareWindow, Title
+from threads import UserDetailsThread
 import foursquare
-from foursquare import Cache
-import ubersquare.gui
+from datetime import datetime
+import time
+
+from venues import CheckinConfirmation, CheckinDetails
+from locationProviders import LocationProvider
+
 
 class UserProfile(QWidget):
-	def __init__(self, user, parent = None):
+	def __init__(self, user, parent=None):
 		super(UserProfile, self).__init__(parent)
 
 		name = user[u'user'][u'firstName']
 		if u'lastName' in user[u'user']:
 			name += " " + user[u'user'][u'lastName']
 
-		description = "<b>" + name + "</b>"
+		description = ""
 		if u'homeCity' in user[u'user']:
-			description += "<br>from " + user[u'user'][u'homeCity']
-		if u'scores' in user:
-			description += "<br>Score: "
-			if u'recent' in user[u'scores']:
-				description += str(user[u'scores'][u'recent'])
-			if u'max' in user[u'scores']:
-				description += " (" + str(user[u'scores'][u'max']) + " max)"
+			description += "From " + user[u'user'][u'homeCity']
 
-		self.descriptionLabel = QLabel()
-		self.descriptionLabel.setText(description)
+		location = ""
+		# FIXME: this may fail!
+		location = user[u'user'][u'checkins'][u'items'][0][u'venue'][u'name']
+		lastSeen = user[u'user'][u'checkins'][u'items'][0][u'createdAt']
+		lastSeen = datetime.fromtimestamp(lastSeen).strftime("%Y-%m-%d %X")
+		location = "Last seen at <b>" +  location + "</b>, at <i>" + lastSeen + "</i>"
+
+		description = description + "<br>" + location
+
+		self.descriptionLabel = QLabel(description)
 		self.descriptionLabel.setWordWrap(True)
 
 		self.photo_label = QLabel()
@@ -48,36 +56,38 @@ class UserProfile(QWidget):
 
 		profileLayout = QGridLayout()
 		self.setLayout(profileLayout)
-		profileLayout.addWidget(self.photo_label, 0, 0)
-		profileLayout.addWidget(self.descriptionLabel, 0, 1, 1, 2)
 
-		#profileLayout.addWidget(QLabel("current user location"), 1, 0, 1, 3)
+		profileLayout.addWidget(self.photo_label, 0, 0, 2, 1)
+		profileLayout.addWidget(Title(name), 0, 1)
+		profileLayout.addWidget(self.descriptionLabel, 1, 1)
 
-class UserDetailsWindow(QMainWindow):
-	def __init__(self, user, fullDetails, parent):
+		profileLayout.setColumnStretch(1, 5)
+
+
+class UserDetailsWindow(UberSquareWindow):
+	def __init__(self, user, parent):
 		super(UserDetailsWindow, self).__init__(parent)
-		self.setAttribute(Qt.WA_Maemo5StackedWindow)
 
 		self.user = user
-		self.fullDetails = fullDetails
 
-		self.centralWidget = QWidget() 
-		self.setCentralWidget(self.centralWidget) 
+		self.centralWidget = QWidget()
+		self.setCentralWidget(self.centralWidget)
 
-		layout = QVBoxLayout() 
-		layout.setSpacing(0)         
-		self.centralWidget.setLayout(layout) 
+		layout = QVBoxLayout()
+		layout.setSpacing(0)
+		layout.setContentsMargins(11, 11, 11, 11)
+		self.centralWidget.setLayout(layout)
 
 		self.container = QWidget()
-		self.scrollArea = QScrollArea() 
+		self.scrollArea = QScrollArea()
 		self.scrollArea.setWidget(self.container)
 		self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
 		layout.addWidget(self.scrollArea)
 		self.scrollArea.setWidgetResizable(True)
 
-		gridLayout = QGridLayout() 
-		self.container.setLayout(gridLayout) 
+		gridLayout = QGridLayout()
+		self.container.setLayout(gridLayout)
 
 		firstName = user[u'user'][u'firstName']
 		name = firstName
@@ -90,34 +100,80 @@ class UserDetailsWindow(QMainWindow):
 		photo_label.setPixmap(QPixmap(photo))
 
 		i = 0
-		gridLayout.addWidget(UserProfile(user), i, 0, 2, 1)
-		gridLayout.addWidget(QPushButton("More info"), i, 1, 1, 1)
-		i += 1
-		# ONLY IF FRIEND!!
-		gridLayout.addWidget(QPushButton("Unfriend"), i, 1, 1, 1)
-		fullDetails = True # TODO: debug stuff!!
+		gridLayout.addWidget(UserProfile(user), i, 0, 1, 2)
+
+		### checkin button
+		if user[u'user'][u'relationship'] != "self":
+			i += 1
+			self.shoutText = QLineEdit(self)
+			self.shoutText.setPlaceholderText("Shout something")
+			gridLayout.addWidget(self.shoutText, i, 0)
+
+			checkinButton = QPushButton("Check-in with " + firstName)
+			self.connect(checkinButton, SIGNAL("clicked()"), self.checkin)
+			gridLayout.addWidget(checkinButton, i, 1)
+
+		if user[u'user'][u'relationship'] == "friend":
+			i += 1
+			#gridLayout.addWidget(QPushButton("Unfriend"), i, 0, 1, 2)
+			gridLayout.addWidget(QLabel("TODO: Unfriend"), i, 0, 1, 2)
+		elif user[u'user'][u'relationship'] == "self":
+			i += 1
+			gridLayout.addWidget(QLabel("It's you!"), i, 0, 1, 2)
 		if user[u'user'][u'id'] == "17270875":
 			i += 1
 			gridLayout.addWidget(QLabel("<b>This is the UberSquare developer!</b>"), i, 0, 1, 2)
 
-		if not fullDetails:
-			i += 1
-			gridLayout.setRowStretch(i, 5)
-		else:
-			i += 1
-			gridLayout.addWidget(QLabel("X Mayorships"), i, 0)
-			i += 1
-			gridLayout.addWidget(QLabel("Y Badges"), i, 0)
-			i += 1
-			gridLayout.addWidget(QPushButton("See places " + firstName + " has been to."), i, 0, 1, 2)
-			i += 1
-			gridLayout.addWidget(QPushButton("Say no to drugs!!!"), i, 0, 1, 2)
-			i += 1
-			gridLayout.addWidget(QPushButton("Say no to drugs!!!"), i, 0, 1, 2)
-			i += 1
-			gridLayout.addWidget(QPushButton("Say no to drugs!!!"), i, 0, 1, 2)
-			i += 1
-			gridLayout.addWidget(QPushButton("Say no to drugs!!!"), i, 0, 1, 2)
+		i += 1
+		checkins = user[u'user'][u'checkins'][u'count']
+		gridLayout.addWidget(QLabel(str(checkins) + " checkins"), i, 0)
+		i += 1
+		badges = user[u'user'][u'badges'][u'count']
+		gridLayout.addWidget(QLabel(str(badges) + " badges"), i, 0)
+		i += 1
+		mayorships = user[u'user'][u'mayorships'][u'count']
+		gridLayout.addWidget(QLabel(str(mayorships) + " mayorships"), i, 0)
+		i += 1
+		gridLayout.addWidget(QPushButton("TODO: See places " + firstName + " has been to."), i, 0, 1, 2)
+
+		i += 1
+		update_user_button = QPushButton("Refresh user details")
+		update_user_button.setIcon(QIcon.fromTheme("general_refresh"))
+		self.connect(update_user_button, SIGNAL("clicked()"), self.__update)
+		gridLayout.addWidget(update_user_button, i, 0, 1, 2)
+
+		showUser = Signal()
+		self.connect(self, SIGNAL("showUser()"), self.__showUser)
+
+	def __update(self):
+		print "updating..."
+		t = UserDetailsThread(self.user[u'user'][u'id'], self)
+		t.start()
+		self.showWaitingDialog.emit()
+
+	def __showUser(self):
+		time.sleep(0.15)
+		self.close()
+		self.uid = self.user[u'user'][u'id']
+		user = foursquare.get_user(self.uid, foursquare.CacheOrNull)
+		if user:
+			self.userWindow = UserDetailsWindow(user, self)
+			self.userWindow.show()
+
+	def checkin(self):
+		venue = self.user[u'user'][u'checkins'][u'items'][0][u'venue']
+
+		c = CheckinConfirmation(self, venue)
+		c.exec_()
+		if c.buttonRole(c.clickedButton()) == CheckinConfirmation.YesRole:
+			try:
+				# TODO: do this in a separate thread
+				ll = LocationProvider().get_ll(venue)
+				response = foursquare.checkin(venue, ll, self.shoutText.text())
+				CheckinDetails(self, response).show()
+			except IOError:
+				self.networkError.emit()
+
 
 class UserListModel(QAbstractListModel):
 	def __init__(self, users):
@@ -150,27 +206,25 @@ class UserListModel(QAbstractListModel):
 		self.users = users
 		self.reset()
 
+
 class UserList(QListView):
 	def __init__(self, users, parent):
-		super(UserList,self).__init__(parent)
+		super(UserList, self).__init__(parent)
 		self.model = UserListModel(users)
 		self.setModel(self.model)
-		self.clicked.connect(self.user_selected)
+		self.clicked.connect(parent.user_selected)
 		self.adjustSize()
-
-	def user_selected(self, index):
-		return
-		# TODO, FIXME, XXX: this dialog is disabled 'cause it's really WIP
-		u = UserDetailsWindow(self.model.data(index, UserListModel.UserRole), False, self)
-		u.show()
-
+	
 	def setUsers(self, users):
 		self.model.setUsers(users)
 
-class UserListWindow(QMainWindow):
+	def getUser(self, index):
+		return self.model.data(index, UserListModel.UserRole)
+
+
+class UserListWindow(UberSquareWindow):
 	def __init__(self, title, users, parent):
 		super(UserListWindow, self).__init__(parent)
-		self.setAttribute(Qt.WA_Maemo5StackedWindow)
 
 		self.setWindowTitle(title)
 
@@ -190,11 +244,6 @@ class UserListWindow(QMainWindow):
 
 		updateUsers = Signal()
 		self.connect(self, SIGNAL("updateUsers()"), self._updateUsers)
-		self.shown = False
-
-	def show(self):
-		super(UserListWindow, self).show()
-		self.shown = True
 
 	def _updateUsers(self):
 		self.setUsers(self.parent().users())
@@ -206,3 +255,22 @@ class UserListWindow(QMainWindow):
 
 	def setUsers(self, users):
 		self.list.setUsers(users)
+
+		showUser = Signal()
+		self.connect(self, SIGNAL("showUser()"), self.__showUser)
+
+	def user_selected(self, index):
+		self.uid = self.list.getUser(index)[u'user'][u'id']
+		user = foursquare.get_user(self.uid, foursquare.CacheOrNull)
+
+		if user:
+			self.userWindow = UserDetailsWindow(user, self)
+			self.userWindow.show()
+		else:
+			t = UserDetailsThread(self.uid, self)
+			t.start()
+
+	def __showUser(self):
+		user = foursquare.get_user(self.uid, foursquare.CacheOrNull)
+		self.userWindow = UserDetailsWindow(user, self)
+		self.userWindow.show()

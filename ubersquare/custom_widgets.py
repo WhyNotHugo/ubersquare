@@ -15,8 +15,9 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 from PySide.QtGui import QDialog, QVBoxLayout, QLabel
-from PySide.QtCore import Signal, SIGNAL, QObject
+from PySide.QtCore import Signal, SIGNAL
 from PySide.QtMaemo5 import QMaemo5ValueButton, QMaemo5ListPickSelector
+
 
 class SignalEmittingValueButton(QMaemo5ValueButton):
 	def __init__(self, text, callback, parent):
@@ -27,8 +28,9 @@ class SignalEmittingValueButton(QMaemo5ValueButton):
 		super(SignalEmittingValueButton, self).setValueText(text)
 		self.callback(self.pickSelector().currentIndex())
 
+
 class WaitingDialog(QDialog):
-	def __init__(self, parent = None):
+	def __init__(self, parent=None):
 		super(WaitingDialog, self).__init__(parent)
 		layout = QVBoxLayout()
 		layout.addWidget(QLabel("Please wait; fetching data from foursquare..."))
@@ -40,6 +42,7 @@ class WaitingDialog(QDialog):
 from PySide.QtCore import *
 from PySide.QtGui import *
 import foursquare
+
 
 class CategoryModel(QAbstractListModel):
 	def __init__(self, categories):
@@ -58,7 +61,7 @@ class CategoryModel(QAbstractListModel):
 		elif role == Qt.DecorationRole:
 			prefix = self.categories[index.row()][u'icon'][u'prefix']
 			extension = self.categories[index.row()][u'icon'][u'name']
-			return QIcon(foursquare.image(prefix + "64" + extension)) 
+			return QIcon(foursquare.image(prefix + "64" + extension))
 		elif role == CategoryModel.CategoryRole:
 			return self.categories[index.row()]
 		elif role == CategoryModel.SubCategoriesRole:
@@ -67,13 +70,15 @@ class CategoryModel(QAbstractListModel):
 	def get_data(self, index):
 		return self.categories[index]
 
+
 class CategoryPickSelector(QMaemo5ListPickSelector):
 	def __init__(self, categories):
 		super(CategoryPickSelector, self).__init__()
 		self.setModel(CategoryModel(categories))
 
+
 class CategorySelector(QWidget):
-	def __init__(self, parent = None):
+	def __init__(self, parent=None):
 		super(CategorySelector, self).__init__(parent)
 		layout = QVBoxLayout()
 		self.setLayout(layout)
@@ -107,8 +112,9 @@ class CategorySelector(QWidget):
 
 ################# WINDOW #########################
 
+
 class UberSquareWindow(QMainWindow):
-	def __init__(self, parent = None):
+	def __init__(self, parent=None):
 		super(UberSquareWindow, self).__init__(parent)
 		self.setAttribute(Qt.WA_Maemo5StackedWindow)
 
@@ -122,6 +128,11 @@ class UberSquareWindow(QMainWindow):
 		self.connect(self, SIGNAL("networkError()"), self.__networkError)
 
 		self.waitDialog = WaitingDialog(self)
+		self.shown = False
+
+	def show(self):
+		super(UberSquareWindow, self).show()
+		self.shown = True
 
 	def __showWaitingDialog(self):
 		self.waitDialog.show()
@@ -134,5 +145,22 @@ class UberSquareWindow(QMainWindow):
 		d = QMessageBox()
 		d.setWindowTitle("Network Error")
 		d.setText("I couldn't connect to foursquare to retrieve data. Make sure you're connected to the internet, and try again (keep in mind that it may have been just a network glitch).")
-		d.addButton( "Ok", QMessageBox.YesRole)
+		d.addButton("Ok", QMessageBox.YesRole)
 		d.exec_()
+
+
+############## VISUAL WIDGETS ##############################
+
+
+class Ruler(QFrame):
+	def __init__(self):
+		super(Ruler, self).__init__()
+		self.setFrameShape(QFrame.HLine)
+		self.setStyleSheet("QFrame { background-color: #313131; color: #313131; height: 2px; }")
+
+
+class Title(QLabel):
+	def __init__(self, text, parent=None):
+		super(Title, self).__init__(text, parent)
+		self.setStyleSheet("QLabel { color: #999999; font-size: 36px; }")
+		self.setWordWrap(True)

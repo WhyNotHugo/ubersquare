@@ -18,23 +18,23 @@ import sys
 from PySide.QtCore import *
 from PySide.QtGui import *
 
-from PySide.QtMaemo5 import QMaemo5ListPickSelector, QMaemo5ValueButton, QMaemo5InformationBox
+from PySide.QtMaemo5 import QMaemo5ValueButton, QMaemo5InformationBox
 
 import foursquare
 import foursquare_auth
-from venues import NewVenueWindow
-from venues import *
+from venues import NewVenueWindow, VenueListWindow
 from foursquare import Cache
 from locationProviders import LocationProviderSelector, LocationProvider
-from threads import VenueProviderThread, UserUpdaterThread, ImageCacheThread, UpdateSelf
-from custom_widgets import SignalEmittingValueButton, WaitingDialog, CategorySelector, UberSquareWindow
-from users import UserListModel, UserList, UserListWindow
+from threads import VenueProviderThread, UserUpdaterThread, ImageCacheThread, UpdateSelf, VenueSearchThread
+from custom_widgets import SignalEmittingValueButton, CategorySelector, UberSquareWindow
+from users import UserListWindow
 from about import AboutDialog
 
+
 class Profile(QWidget):
-	def __init__(self, parent = None):
+	def __init__(self, parent=None):
 		super(Profile, self).__init__(parent)
-		self.user = foursquare.get_user("self", Cache.CacheOrGet)[u'user']
+		self.user = foursquare.get_user("self", foursquare.CacheOrGet)[u'user']
 		self.photo_label = QLabel()
 
 		self.textLabel = QLabel()
@@ -52,9 +52,6 @@ class Profile(QWidget):
 
 		selfUpdated = Signal()
 		self.connect(self, SIGNAL("selfUpdated()"), self.__updateInfo)
-		# networkError = Signal()
-
-	# def __networkError
 
 	def __clicked(self):
 		t = UpdateSelf(self)
@@ -64,9 +61,10 @@ class Profile(QWidget):
 	def mousePressEvent(self, event):
 		self.clicked.emit()
 
-	def __updateInfo(self, initial = False):
+	def __updateInfo(self, initial=False):
 		if not initial:
 			QMaemo5InformationBox.information(self, "Stats updated!", 1500)
+			self.user = foursquare.get_user("self", foursquare.CacheOrGet)[u'user']
 		name = "<b>"
 		if u'firstName' in self.user:
 			name += self.user[u'firstName'] + " "
@@ -84,32 +82,33 @@ class Profile(QWidget):
 		self.photo = QImage(foursquare.image(self.user[u'photo']))
 		self.photo_label.setPixmap(QPixmap(self.photo))
 
+
 class MainWindow(UberSquareWindow):
 	def __init__(self):
 		super(MainWindow, self).__init__(None)
 		self.setWindowTitle("UberSquare")
 
-		self.centralWidget = QWidget() 
+		self.centralWidget = QWidget()
 		self.setCentralWidget(self.centralWidget)
 
-		#Main Layout 
-		layout = QVBoxLayout() 
-		layout.setSpacing(0)         
-		self.centralWidget.setLayout(layout) 
+		#Main Layout
+		layout = QVBoxLayout()
+		layout.setSpacing(0)
+		self.centralWidget.setLayout(layout)
 
-		#Content Layout 
-		self.container = QWidget() 
+		#Content Layout
+		self.container = QWidget()
 
-		self.scrollArea = QScrollArea() 
-		self.scrollArea.setWidget(self.container)           
+		self.scrollArea = QScrollArea()
+		self.scrollArea.setWidget(self.container)
 
-		layout.addWidget(self.scrollArea)   
+		layout.addWidget(self.scrollArea)
 
 		self.scrollArea.setWidgetResizable(True)
 
-		gridLayout = QGridLayout() 
-		self.container.setLayout(gridLayout) 
-		
+		gridLayout = QGridLayout()
+		self.container.setLayout(gridLayout)
+
 		previous_venues_button = QPushButton("Visited")
 		previous_venues_button.setIcon(QIcon.fromTheme("general_clock"))
 		self.connect(previous_venues_button, SIGNAL("clicked()"), self.previous_venues_pushed)
@@ -181,18 +180,6 @@ class MainWindow(UberSquareWindow):
 	def __showSearchResults(self):
 		self.progressDialog().close()
 
-	def setVenues(self, venues):
-		self.__venues = venues
-
-	def venues(self):
-		return self.__venues
-
-	def setUsers(self, venues):
-		self.__users = venues
-
-	def users(self):
-		return self.__users
-
 	def setupMenu(self):
 		about = QAction(self)
 		about.setText("About")
@@ -253,37 +240,27 @@ class MainWindow(UberSquareWindow):
 			self.networkError.emit()
 
 	def search_venues_pushed(self):
-		dialog = QDialog(self)
-		dialog.setWindowTitle("Search")
-		dialog.centralWidget = QWidget() 
-
-		#Main Layout 
-		layout = QGridLayout() 
-		#layout.setSpacing(0)
-		dialog.setLayout(layout)
-
-		self.searchQuery = QLineEdit(self)
-		self.searchQuery.setPlaceholderText("Search query")
-
-		button = QPushButton("Search")
-		self.connect(button, SIGNAL("clicked()"), dialog.accept)
-
-		categorySelector = CategorySelector()
-
-		layout.addWidget(categorySelector, 0, 0)
-		layout.addWidget(self.searchQuery, 1, 0)
-		layout.addWidget(button, 1, 1)
-		
+		dialog = SearchDialog(self)
 		dialog.exec_()
 
-		if (dialog.result() == QDialog.Accepted):
-			categoryId = categorySelector.selectedCategory()
+		if (dialog.result() != QDialog.Accepted):
+			return None
 
-		 	try:
-		 		win = VenueListWindow("Search results", foursquare.venues_search(self.searchQuery.text(), LocationProvider().get_ll(), categoryId), self)
-		 		win.show()
-		 	except IOError:
-		 		self.networkError.emit()
+		venueName = dialog.text().encode('utf-8')
+		categoryId = dialog.category()
+		ll = LocationProvider().get_ll()
+
+		try:
+			venues = foursquare.venues_search(venueName, ll, categoryId, foursquare.DefaultFetchAmount, foursquare.CacheOrNull)
+			v = VenueListWindow("Search results", venues, self)
+			t = VenueSearchThread(v, foursquare.venues_search, venueName, ll, categoryId, foursquare.DefaultFetchAmount, self)
+			t.start()
+			if venues:
+				v.show()
+			else:
+				self.showWaitingDialog.emit()
+		except IOError:
+			self.networkError.emit()
 
 	def locationSelected(self, index):
 		LocationProvider().select(index)
@@ -296,6 +273,49 @@ class MainWindow(UberSquareWindow):
 		except IOError:
 			self.networkError.emit()
 
+	def setVenues(self, venues):
+		self.__venues = venues
+
+	def venues(self):
+		return self.__venues
+
+	def setUsers(self, venues):
+		self.__users = venues
+
+	def users(self):
+		return self.__users
+
+
+class SearchDialog(QDialog):
+	def __init__(self, parent):
+		super(SearchDialog, self).__init__(parent)
+		self.setWindowTitle("Search")
+		self.centralWidget = QWidget()
+
+		#Main Layout
+		layout = QGridLayout()
+		#layout.setSpacing(0)
+		self.setLayout(layout)
+
+		self.searchQuery = QLineEdit(self)
+		self.searchQuery.setPlaceholderText("Search query")
+
+		button = QPushButton("Search")
+		self.connect(button, SIGNAL("clicked()"), self.accept)
+
+		self.categorySelector = CategorySelector()
+
+		layout.addWidget(self.categorySelector, 0, 0)
+		layout.addWidget(self.searchQuery, 1, 0)
+		layout.addWidget(button, 1, 1)
+
+	def category(self):
+		return self.categorySelector.selectedCategory()
+
+	def text(self):
+		return self.searchQuery.text()
+
+
 def start():
 	app = QApplication(sys.argv)
 
@@ -307,7 +327,7 @@ def start():
 		msgBox.setWindowTitle("First run")
 		msgBox.addButton("Ok", QMessageBox.AcceptRole)
 		msgBox.addButton("Cancel", QMessageBox.RejectRole)
-		res = msgBox.exec_()
+		msgBox.exec_()
 		if msgBox.buttonRole(msgBox.clickedButton()) == QMessageBox.AcceptRole:
 			foursquare_auth.fetch_code()
 			foursquare_auth.fetch_token()
@@ -315,22 +335,22 @@ def start():
 			d = QMessageBox()
 			d.setWindowTitle("Image cache")
 			d.setText("In order to save bandwidth, category images are cached.  To download these images for a first time, click \"Update image cache\". This'll take some time, but will <b>really</b> speed up searches.")
-			d.addButton( "Ok", QMessageBox.YesRole)
+			d.addButton("Ok", QMessageBox.YesRole)
 			d.exec_()
 
 	if token_present:
 		try:
-			foursquare.get_user("self", Cache.CacheOrGet)
+			foursquare.get_user("self", foursquare.CacheOrGet)
 		except IOError:
 			d = QMessageBox()
 			d.setWindowTitle("Network Error")
 			d.setText("I couldn't connect to foursquare to retrieve data. Make sure you're connected to the internet, and try again (keep in mind that it may have been just a network glitch).")
-			d.addButton( "Ok", QMessageBox.YesRole)
+			d.addButton("Ok", QMessageBox.YesRole)
 			d.exec_()
-			
+
 		main_window = MainWindow()
 		main_window.show()
- 
+
 	sys.exit(app.exec_())
 
 if __name__ == '__main__':

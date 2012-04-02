@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
 #
 # Permission to use, copy, modify, and distribute this software for any
@@ -13,22 +15,28 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 from PySide.QtGui import QDialog, QLabel, QPushButton, QVBoxLayout, QMessageBox
-from PySide.QtCore import Signal, SIGNAL
+from PySide.QtCore import SIGNAL
+try:
+	import json
+except ImportError:
+	import simplejson as json
+
 
 class CheckinConfirmation(QMessageBox):
 	def __init__(self, parent, venue):
 		super(CheckinConfirmation, self).__init__(parent)
-		
+
 		self.setWindowTitle("Confirmation")
 		text = "Do you want to check-in at <b>" + venue[u'name'] + "</b>"
 		if u'address' in venue[u'location']:
-			text += " located at " + venue[u'location'][u'address']	
+			text += " located at " + venue[u'location'][u'address']
 		text += "?"
 		self.setText(text)
 
 		self.addButton("Yes", QMessageBox.YesRole)
 		self.addButton("No", QMessageBox.NoRole)
 		self.setIcon(QMessageBox.Question)
+
 
 class CheckinDetails(QDialog):
 	def __init__(self, parent, checking_details):
@@ -48,7 +56,7 @@ class CheckinDetails(QDialog):
 				score += "Total points: %d" % item[u'item'][u'total']
 				for scoreItem in item[u'item'][u'scores']:
 					score += "<br>+%(points)d   %(message)s" % \
-					{'points': scoreItem[u'points'], 'message' : scoreItem[u'message']}
+					{'points': scoreItem[u'points'], 'message': scoreItem[u'message']}
 				score += "<p>"
 			elif item[u'type'] == "mayorship":
 				mayorship = item[u'item'][u'message']
@@ -60,9 +68,9 @@ class CheckinDetails(QDialog):
 
 		vbox = QVBoxLayout()
 		vbox.addWidget(QLabel(text))
-	
+
 		ok_button = QPushButton("Ok")
 		self.connect(ok_button, SIGNAL("clicked()"), self.close)
- 
+
 		vbox.addWidget(ok_button)
 		self.setLayout(vbox)

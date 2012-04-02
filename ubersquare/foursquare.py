@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
 #
 # Permission to use, copy, modify, and distribute this software for any
@@ -21,18 +23,19 @@ import sys
 import sqlite3
 import os
 from urlparse import urlparse
-import atexit
 from xdg import BaseDirectory
 
-CLIENT_ID="A0IJ0P4EFRO50JUEYALJDGR52RDS0O4H1OKPSIEYZ5LHSNGH"
-CLIENT_SECRET="ACDUWAODBXRUPXHMVVWOXXATFN0PM0GP2PSLI5MZZCTUQ2TV"
-CALLBACK_URI="http://localhost:6060/auth"
+CLIENT_ID = "A0IJ0P4EFRO50JUEYALJDGR52RDS0O4H1OKPSIEYZ5LHSNGH"
+CLIENT_SECRET = "ACDUWAODBXRUPXHMVVWOXXATFN0PM0GP2PSLI5MZZCTUQ2TV"
+CALLBACK_URI = "http://localhost:6060/auth"
 
 authData = dict()
 
-BASE_URL="https://api.foursquare.com/v2/"
+BASE_URL = "https://api.foursquare.com/v2/"
 API_VERSION = "20120208"
 DEBUG = False
+
+DefaultFetchAmount = 25
 
 cache_dir = os.path.join(BaseDirectory.xdg_cache_home, "ubersquare/")
 image_dir = os.path.join(BaseDirectory.xdg_data_home, "ubersquare/images/")
@@ -58,8 +61,10 @@ if not os.path.exists(config):
 	conn.execute("CREATE TABLE IF NOT EXISTS config (property TEXT PRIMARY KEY, value TEXT)")
 	conn.close()
 
+
 def debug(string):
 	print string
+
 
 def debug_json(string):
 	print json.dumps(string, sort_keys=True, indent=4)
@@ -68,17 +73,20 @@ def debug_json(string):
 # CACHE/FOURSQUARE #
 ####################
 
+
 def config_set(property, value):
 	conn = sqlite3.connect(config)
 	conn.execute("INSERT OR REPLACE INTO config VALUES (?, ?)", (property, value))
 	conn.commit()
 	conn.close()
 
+
 def config_del(property):
 	conn = sqlite3.connect(config)
 	conn.execute("DELETE FROM config WHERE property = ?", (property,))
 	conn.commit()
 	conn.close()
+
 
 def config_get(property):
 	value = None
@@ -102,10 +110,12 @@ CacheOrNull = 3
 CacheOrGet = True
 ForceFetch = False
 
+
 class Cache:
 	CacheOrNull = 3
 	CacheOrGet = True
-	ForceFetch = False	
+	ForceFetch = False
+
 
 def cacheModeToString(cacheMode):
 	if cacheMode == CacheOnly:
@@ -115,7 +125,8 @@ def cacheModeToString(cacheMode):
 	elif cacheMode == NoCache:
 		return "Don't read from cache"
 
-def foursquare_get(path, params, read_cache = False, callback = None):
+
+def foursquare_get(path, params, read_cache=False, callback=None):
 	commonParams = {'oauth_token': authData['ACCESS_TOKEN'], 'v': API_VERSION}
 	allParams = urllib.urlencode(dict(commonParams.items() + params.items()))
 
@@ -125,7 +136,7 @@ def foursquare_get(path, params, read_cache = False, callback = None):
 	print "-----"
 	print "Getting " + resource
 	print "Using cache: " + cacheModeToString(read_cache) + "..."
-	
+
 	c = conn.cursor()
 	if read_cache == CacheOrGet or read_cache == CacheOrNull:
 		c.execute("SELECT value FROM queries WHERE resource = ?", (resource,))
@@ -146,21 +157,20 @@ def foursquare_get(path, params, read_cache = False, callback = None):
 	conn.close()
 
 	if response:
-		response = json.loads(response,"UTF-8")
+		response = json.loads(response, "UTF-8")
 	return response
+
 
 def foursquare_post(path, params):
 	commonParams = {'oauth_token': authData['ACCESS_TOKEN'], 'v': API_VERSION}
 	allParams = dict(commonParams.items() + params.items())
-
 	allParams = dict([k, v.encode('utf-8')] for k, v in allParams.items())
-
 	allParams = urllib.urlencode(allParams)
 
 	resource = urllib.urlopen(BASE_URL + path, allParams)
 	response = json.load(resource, "UTF-8")
-	debug_json(response)
 	return response
+
 
 def image(path):
 	url = urlparse(path)
@@ -183,9 +193,10 @@ def image(path):
 # AUXILIARY FUNCTIONS #
 #######################
 
+
 def build_venue_array(source):
 	venues = dict()
-	i = 0;
+	i = 0
 	for venue in source:
 		if u'beenHere' in venue:
 			 # Dirty, but the the model is too much in use to avoid this at 4am
@@ -196,27 +207,31 @@ def build_venue_array(source):
 
 ###############################################################################
 
+
 def get_history(read_cache):
 	response = foursquare_get("users/self/venuehistory", {}, read_cache)
 	if response:
 		return build_venue_array(response[u'response'][u'venues'][u'items'])
+
 
 def lists_todos(read_cache):
 	response = foursquare_get("lists/self/todos", {}, read_cache)
 	if response:
 		return build_venue_array(response[u'response'][u'list'][u'listItems'][u'items'])
 
-def venues_search(query, ll, category = "", intent = "checkin", limit = 25):
-	response = foursquare_get("venues/search", {'query': query, 'll': ll, 'intent' : intent, 'categoryId' : category, 'limit': limit})
+
+def venues_search(query, ll, category, limit, read_cache):
+	response = foursquare_get("venues/search", {'query': query, 'll': ll, 'intent': "checkin", 'categoryId': category, 'limit': limit}, read_cache)
 	if response:
 		venues = dict()
-		i = 0;
+		i = 0
 		for venue in response[u'response'][u'venues']:
 			# Esto puede parecer cualquiera, pero es para que tenga el mismo formato que los dem&aacute;s, y sean todas las listas iguales
 			venues[i] = dict()
 			venues[i][u'venue'] = venue
 			i += 1
 		return venues
+
 
 def get_user(uid, read_cache):
 	"""
@@ -226,17 +241,20 @@ def get_user(uid, read_cache):
 	if response:
 		return response[u'response']
 
+
 def get_venue(venueId):
 	response = foursquare_get("/venues/%s?" % venueId, {})
 	if response:
 		return response[u'response'][u'venue']
 
-def checkin(venue, ll, shout = ""):
+
+def checkin(venue, ll, shout=""):
 	"""
 	Checks in the user at venue with lat/lng ll
 	"""
 	response = foursquare_post("/checkins/add", {'shout': shout, 'venueId': venue[u'id'], 'broadcast': "public,facebook", 'll': ll})
 	return response
+
 
 def get_last_ll():
 	"""
@@ -255,7 +273,8 @@ def get_last_ll():
 
 	return ll
 
-def get_venues_categories(readCache = Cache.CacheOrGet):
+
+def get_venues_categories(readCache=CacheOrGet):
 	"""
 	Returns a hierarchical list of categories applied to venues.
 	"""
@@ -263,7 +282,8 @@ def get_venues_categories(readCache = Cache.CacheOrGet):
 	if response:
 		return response[u'response'][u'categories']
 
-def venue_add(venue, ignoreDuplicates = False, ignoreDuplicatesKey = None):
+
+def venue_add(venue, ignoreDuplicates=False, ignoreDuplicatesKey=None):
 	"""
 	required: name, ll
 	optional: address, crossAddress, city, state, zip, phone, twitter, primaryCategoryId, description, url
@@ -272,16 +292,19 @@ def venue_add(venue, ignoreDuplicates = False, ignoreDuplicatesKey = None):
 	response = foursquare_post("venues/add", venue)
 	return response
 
-def venues_venue(venueId, readCache = CacheIfPosible):
+
+def venues_venue(venueId, readCache=CacheIfPosible):
 	response = foursquare_get("venues/" + venueId, {}, readCache)
 	if response:
 		#response > venue > tips > groups [] > items [] >
 		return response[u'response'][u'venue']
 
+
 def users_leaderboard(read_cache):
 	response = foursquare_get("users/leaderboard", {}, read_cache)
 	if response:
 		return response[u'response'][u'leaderboard'][u'items']
+
 
 def __delete_venue_with_tip(tipId):
 	"""
@@ -290,33 +313,37 @@ def __delete_venue_with_tip(tipId):
 	This may change if future </lie>
 	"""
 	conn = sqlite3.connect(query_cache)
-	conn.execute("DELETE FROM queries WHERE value LIKE ?", ("%"+tipId+"%",))
+	conn.execute("DELETE FROM queries WHERE value LIKE ?", ("%" + tipId + "%",))
 	conn.commit()
 	conn.close()
 
-def tip_add(venueId, text, url = "", broadcast = ""):
+
+def tip_add(venueId, text, url="", broadcast=""):
 	response = foursquare_post("/tips/add", {'venueId': venueId, 'text': text, 'url': url, 'broadcast': broadcast})
 	return response
+
 
 def tip_marktodo(tipId, marked):
 	if marked:
 		response = foursquare_post("tips/" + tipId + "/marktodo", {})
 	else:
-		response = foursquare_post("lists/self/todos/deleteitem", { 'itemId': tipId })
+		response = foursquare_post("lists/self/todos/deleteitem", {'itemId': tipId})
 	__delete_venue_with_tip(tipId)
 	return response
+
 
 def tip_markdone(tipId, marked):
 	if marked:
 		response = foursquare_post("tips/" + tipId + "/markdone", {})
 	else:
-		response = foursquare_post("lists/self/dones/deleteitem", { 'itemId': tipId })
+		response = foursquare_post("lists/self/dones/deleteitem", {'itemId': tipId})
 	__delete_venue_with_tip(tipId)
 	return response
 
 ############################
 # Extra one-time functions #
 ############################
+
 
 def fetch_category_image(category):
 	prefix = category[u'icon'][u'prefix']
@@ -326,14 +353,15 @@ def fetch_category_image(category):
 		for category in category[u'categories']:
 			fetch_category_image(category)
 
+
 def init_category_icon_cache():
-	categories = get_venues_categories(Cache.ForceFetch)
+	categories = get_venues_categories(ForceFetch)
 	for category in categories:
 		fetch_category_image(category)
 	print "done updating image cache"
 
+
 def init():
-	print "Reading code/acces_token"
 	authData['CODE'] = config_get("code")
 	authData['ACCESS_TOKEN'] = config_get("access_token")
 
