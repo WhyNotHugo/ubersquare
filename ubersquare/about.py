@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
 #
 # Permission to use, copy, modify, and distribute this software for any
@@ -15,8 +17,9 @@
 
 from PySide.QtGui import QApplication, QDialog, QWidget, QScrollArea, QGridLayout, QLabel, QFrame, QVBoxLayout
 
+
 class AboutDialog(QDialog):
-	def __init__(self, parent = None):
+	def __init__(self, parent=None):
 		super(AboutDialog, self).__init__(parent)
 		title = "About UberSquare"
 		aboutText = "UberSquare is a foursquare for maemo, specifically, for the Nokia N900.  Be sure to report any bugs you may find, and feel free to email me if you have any suggestions, etc."
@@ -33,25 +36,25 @@ This application uses the foursquare(r) application programming interface but is
 """
 
 		self.setWindowTitle(title)
-		self.centralWidget = QWidget() 
+		self.centralWidget = QWidget()
 
-		#Main Layout 
-		layout = QVBoxLayout() 
-		layout.setSpacing(0)         
-		self.setLayout(layout) 
+		#Main Layout
+		layout = QVBoxLayout()
+		layout.setSpacing(0)
+		self.setLayout(layout)
 
-		#Content Layout 
-		self.container = QWidget() 
+		#Content Layout
+		self.container = QWidget()
 
-		self.scrollArea = QScrollArea() 
-		self.scrollArea.setWidget(self.container)           
+		self.scrollArea = QScrollArea()
+		self.scrollArea.setWidget(self.container)
 
-		layout.addWidget(self.scrollArea)   
+		layout.addWidget(self.scrollArea)
 
 		self.scrollArea.setWidgetResizable(True)
 
-		gridLayout = QGridLayout() 
-		self.container.setLayout(gridLayout) 
+		gridLayout = QGridLayout()
+		self.container.setLayout(gridLayout)
 
 		aboutTextLabel = QLabel(aboutText)
 		aboutTextLabel.setWordWrap(True)

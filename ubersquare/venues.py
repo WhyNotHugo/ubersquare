@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
 #
 # Permission to use, copy, modify, and distribute this software for any
@@ -15,22 +17,16 @@
 #from PySide.QtGui import QDesktopServices
 from PySide.QtCore import *
 from PySide.QtGui import *
-import sys
-import foursquare
 from foursquare import Cache
 from locationProviders import LocationProvider
-from custom_widgets import SignalEmittingValueButton, WaitingDialog, CategorySelector, UberSquareWindow
-from threads import TipMarkTodoBackgroundThread, TipMarkDoneBackgroundThread, LeaveTipThread
-import time
-
-try:
-	from PySide.QtMaemo5 import *
-	maemo = True
-except ImportError:
-	maemo = False
-
+from custom_widgets import CategorySelector, UberSquareWindow, Ruler, Title
+from threads import TipMarkTodoBackgroundThread, TipMarkDoneBackgroundThread, LeaveTipThread, VenueDetailsThread
+from PySide.QtMaemo5 import *
 from checkins import CheckinConfirmation, CheckinDetails
-		
+
+import foursquare
+
+
 class VenueListModel(QAbstractListModel):
 	def __init__(self, venues):
 		super(VenueListModel, self).__init__()
@@ -47,14 +43,16 @@ class VenueListModel(QAbstractListModel):
 	def data(self, index, role=Qt.DisplayRole):
 		venue = self.venues[index.row()][u'venue']
 		if role == Qt.DisplayRole:
+			name = venue[u'name']
+			if len(name) > 72:
+				name = name[0:70]
 			if u'address' in venue[u'location']:
-				result = venue[u'name'] + "\n  " + venue[u'location'][u'address']
-				if len(result) < 72:
-					return result
-				else:
-					return result[0:67] + "[...]"
+				address = venue[u'location'][u'address']
+				if len(address) > 72:
+					address = address[0:70]
+				return name + "\n  " + address
 			else:
-				return venue[u'name']
+				return name
 		elif role == Qt.DecorationRole:
 			if len(venue[u'categories']) > 0:
 				prefix = venue[u'categories'][0][u'icon'][u'prefix']
@@ -67,12 +65,13 @@ class VenueListModel(QAbstractListModel):
 		self.venues = venues
 		self.reset()
 
+
 class VenueList(QListView):
 	def __init__(self, parent, venues):
-		super(VenueList,self).__init__(parent)
+		super(VenueList, self).__init__(parent)
 		self.model = VenueListModel(venues)
 		#self.setModel(self.model)
-		
+
 		self.proxy = QSortFilterProxyModel(self)
 		self.proxy.setSourceModel(self.model)
 		self.proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)
@@ -81,7 +80,7 @@ class VenueList(QListView):
 		self.clicked.connect(self.venue_selected)
 
 	def venue_selected(self, index):
-		venue = self.proxy.data(index,VenueListModel.VenueRole)
+		venue = self.proxy.data(index, VenueListModel.VenueRole)
 		cachedVenue = foursquare.venues_venue(venue[u'id'], foursquare.CacheOnly)
 		if not cachedVenue:
 			d = VenueDetailsWindow(self, venue, False)
@@ -89,18 +88,17 @@ class VenueList(QListView):
 			d = VenueDetailsWindow(self, cachedVenue, True)
 		d.show()
 
-	def filter(self,text):
+	def filter(self, text):
 		self.proxy.setFilterRegExp(text)
 		self.proxy.filterRegExp()
 
 	def setVenues(self, venues):
 		self.model.setVenues(venues)
 
-class VenueListWindow(QMainWindow):
+
+class VenueListWindow(UberSquareWindow):
 	def __init__(self, title, venues, parent):
 		super(VenueListWindow, self).__init__(parent)
-		if maemo:
-			self.setAttribute(Qt.WA_Maemo5StackedWindow)
 
 		self.setWindowTitle(title)
 
@@ -109,7 +107,8 @@ class VenueListWindow(QMainWindow):
 
 		layout = QVBoxLayout(self.cw)
 
-		self.text_field = QLineEdit(self) #QPlainTextEdit es multilinea
+		self.text_field = QLineEdit(self)
+		#QPlainTextEdit es multilinea
 		self.text_field.setPlaceholderText("Type to filter")
 		self.list = VenueList(self, venues)
 
@@ -120,11 +119,6 @@ class VenueListWindow(QMainWindow):
 
 		updateVenues = Signal()
 		self.connect(self, SIGNAL("updateVenues()"), self._updateVenues)
-		self.shown = False
-
-	def show(self):
-		super(VenueListWindow, self).show()
-		self.shown = True
 
 	def _updateVenues(self):
 		self.setVenues(self.parent().venues())
@@ -137,12 +131,13 @@ class VenueListWindow(QMainWindow):
 	def setVenues(self, venues):
 		self.list.setVenues(venues)
 
+
 class Tip(QWidget):
-	def __init__(self, tip, parent = None):
+	def __init__(self, tip, parent=None):
 		super(Tip, self).__init__(parent)
 
-		gridLayout = QGridLayout() 
-		self.setLayout(gridLayout) 
+		gridLayout = QGridLayout()
+		self.setLayout(gridLayout)
 		self.tip = tip
 
 		tipLabel = QLabel(tip[u'text'], self)
@@ -171,7 +166,7 @@ class Tip(QWidget):
 
 	def isTipDone(self):
 		return self.isTipInGroupType("dones")
-		
+
 	def isTipTodo(self):
 		return self.isTipInGroupType("todos")
 
@@ -181,13 +176,14 @@ class Tip(QWidget):
 	def markDone(self, state):
 		TipMarkDoneBackgroundThread(self.tip[u'id'], self.done_checkbox.isChecked(), self).start()
 
+
 class NewTipWidget(QWidget):
-	def __init__(self, venueId, parent = None):
+	def __init__(self, venueId, parent=None):
 		super(NewTipWidget, self).__init__(parent)
 		self.__parent = parent
 
-		gridLayout = QGridLayout() 
-		self.setLayout(gridLayout) 
+		gridLayout = QGridLayout()
+		self.setLayout(gridLayout)
 		self.venueId = venueId
 
 		self.tip_text = QLineEdit()
@@ -203,11 +199,6 @@ class NewTipWidget(QWidget):
 		t.start()
 		self.__parent.showWaitingDialog.emit()
 
-class Ruler(QFrame):
-	def __init__(self):
-		super(Ruler, self).__init__()
-		self.setFrameShape(QFrame.HLine)
-		self.setStyleSheet("QFrame { background-color: #313131; color: #313131; height: 2px; }")
 
 class VenueDetailsWindow(UberSquareWindow):
 	def __init__(self, parent, venue, fullDetails):
@@ -218,26 +209,26 @@ class VenueDetailsWindow(UberSquareWindow):
 
 		self.setWindowTitle(venue[u'name'])
 
-		self.centralWidget = QWidget() 
-		self.setCentralWidget(self.centralWidget) 
+		self.centralWidget = QWidget()
+		self.setCentralWidget(self.centralWidget)
 
-		layout = QVBoxLayout() 
-		layout.setSpacing(0)         
-		layout.setContentsMargins(11,11,11,11)
-		self.centralWidget.setLayout(layout) 
+		layout = QVBoxLayout()
+		layout.setSpacing(0)
+		layout.setContentsMargins(11, 11, 11, 11)
+		self.centralWidget.setLayout(layout)
 
 		self.container = QWidget()
 
-		self.scrollArea = QScrollArea() 
+		self.scrollArea = QScrollArea()
 		self.scrollArea.setWidget(self.container)
 		self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-		layout.addWidget(self.scrollArea)   
+		layout.addWidget(self.scrollArea)
 
 		self.scrollArea.setWidgetResizable(True)
 
-		gridLayout = QGridLayout() 
-		self.container.setLayout(gridLayout) 
+		gridLayout = QGridLayout()
+		self.container.setLayout(gridLayout)
 
 		# name
 		name = venue[u'name']
@@ -274,7 +265,7 @@ class VenueDetailsWindow(UberSquareWindow):
 			if count == 1:
 				times += "once"
 			else:
-				times += str(count) +" times"
+				times += str(count) + " times"
 			times += "</b>"
 		else:
 			times = "<b>You've never been here</b>"
@@ -288,13 +279,11 @@ class VenueDetailsWindow(UberSquareWindow):
 		self.shout_text.setPlaceholderText("Shout something")
 		gridLayout.addWidget(self.shout_text, i, 0)
 		i += 1
-		nameLabel = QLabel(name, self)
-		nameLabel.setStyleSheet("QLabel { color: #999999; font-size: 36px; }")
-		gridLayout.addWidget(nameLabel, i, 0, 1 ,2)
+		gridLayout.addWidget(Title(name, self), i, 0, 1, 2)
 		i += 1
-		gridLayout.addWidget(QLabel(address, self), i, 0, 1 ,2)
+		gridLayout.addWidget(QLabel(address, self), i, 0, 1, 2)
 		i += 1
-		gridLayout.addWidget(QLabel(address2, self), i, 0, 1 ,2)
+		gridLayout.addWidget(QLabel(address2, self), i, 0, 1, 2)
 		for item in venue[u'categories']:
 			if u'primary' in item and item[u'primary'] == "true":
 				i += 1
@@ -328,18 +317,19 @@ class VenueDetailsWindow(UberSquareWindow):
 			i += 1
 			gridLayout.addWidget(QLabel(hereNow, self), i, 0)
 
-		i += 1
 		if u'phone' in venue[u'contact']:
-			phoneCallButton = QPushButton("Call")
+			i += 1
+			phoneCallButton = QPushButton("Call (" + venue[u'contact'][u'formattedPhone'] + ")")
 			phoneCallButton.setIcon(QIcon.fromTheme("general_call"))
 			self.connect(phoneCallButton, SIGNAL("clicked()"), self.startPhoneCall)
-			gridLayout.addWidget(phoneCallButton, i, 0)
-				
+			gridLayout.addWidget(phoneCallButton, i, 0, 1, 2)
+
 		if u'url' in venue:
+			i += 1
 			websiteButton = QPushButton("Visit Website")
 			websiteButton.setIcon(QIcon.fromTheme("general_web"))
 			self.connect(websiteButton, SIGNAL("clicked()"), self.openUrl)
-			gridLayout.addWidget(websiteButton, i, 1)
+			gridLayout.addWidget(websiteButton, i, 0, 1, 2)
 
 		if u'mayor' in venue:
 			if u'user' in venue[u'mayor']:
@@ -352,7 +342,7 @@ class VenueDetailsWindow(UberSquareWindow):
 			else:
 				mayorButton = QLabel("This venue has no mayor")
 			i += 1
-			gridLayout.addWidget(mayorButton, i, 0, 1, 2, Qt.AlignHCenter)
+			gridLayout.addWidget(mayorButton, i, 0, 1, 2)
 
 		# TODO: menu
 		# TODO: specials
@@ -377,13 +367,14 @@ class VenueDetailsWindow(UberSquareWindow):
 						gridLayout.addWidget(line, i, 0, 1, 2)
 
 			i += 1
-			gridLayout.addWidget(NewTipWidget(venue[u'id'], self), i, 0, 1 ,2)
+			gridLayout.addWidget(NewTipWidget(venue[u'id'], self), i, 0, 1, 2)
 
 		if not fullDetails:
-			info_button_label = "Fetch tips and details"
+			info_button_label = "Fetch full details"
 		else:
-			info_button_label = "Force update info"
+			info_button_label = "Refresh venue details"
 		more_info_button = QPushButton(info_button_label)
+		more_info_button.setIcon(QIcon.fromTheme("general_refresh"))
 		self.connect(more_info_button, SIGNAL("clicked()"), self.more_info)
 
 		i += 1
@@ -409,9 +400,8 @@ class VenueDetailsWindow(UberSquareWindow):
 			venue = foursquare.venues_venue(self.venue['id'], Cache.CacheOrNull)
 			if venue:
 				self.close()
-				v = VenueDetailsWindow(self.parent(), venue, True).show()
+				VenueDetailsWindow(self.parent(), venue, True).show()
 				return
-
 		# FIXME!
 		self.fullDetails = False
 		VenueDetailsThread(self.venue['id'], self).start()
@@ -422,35 +412,13 @@ class VenueDetailsWindow(UberSquareWindow):
 		c.exec_()
 		if c.buttonRole(c.clickedButton()) == QMessageBox.YesRole:
 			try:
+				# TODO: do this in a separate thread
 				ll = LocationProvider().get_ll(self.venue)
 				response = foursquare.checkin(self.venue, ll, self.shout_text.text())
 				CheckinDetails(self, response).show()
 			except IOError:
-	 			self.ibox = QMaemo5InformationBox()
-	 			self.ibox.information(self, "Network error; check-in failed. Please try again.", 15000)
+				self.networkError.emit()
 
-class VenueDetailsThread(QThread):	
-	def __init__(self, venueId, parent):
-		super(VenueDetailsThread, self).__init__(parent)
-		self.__parent = parent
-		self.venueId = venueId
-		
-	def run(self):
-		try:
-			venue = foursquare.venues_venue(self.venueId, Cache.ForceFetch)
-			if u'mayor' in venue:
-				if u'user' in venue[u'mayor']:
-					print "there's a mayor!"
-					foursquare.image(venue[u'mayor'][u'user'][u'photo'])
-			self.__parent.hideWaitingDialog.emit()
-			# This tiny sleep in necesary to (a) Avoid an Xorg warning, (b) achieve a smoother transition
-			time.sleep(0.15)
-			self.__parent.showMoreInfo.emit()
-		except IOError:
-			self.__parent.hideWaitingDialog.emit()
-			self.__parent.networkError.emit()
-		self.exec_()
-		self.exit(0)
 
 class NewVenueWindow(QMainWindow):
 	def __init__(self, parent, categories, ll):
@@ -461,26 +429,26 @@ class NewVenueWindow(QMainWindow):
 
 		self.setWindowTitle("New Venue")
 
-		self.centralWidget = QWidget() 
-		self.setCentralWidget(self.centralWidget) 
+		self.centralWidget = QWidget()
+		self.setCentralWidget(self.centralWidget)
 
-		#Main Layout 
-		layout = QVBoxLayout() 
-		layout.setSpacing(0)         
-		self.centralWidget.setLayout(layout) 
+		#Main Layout
+		layout = QVBoxLayout()
+		layout.setSpacing(0)
+		self.centralWidget.setLayout(layout)
 
-		#Content Layout 
-		self.container = QWidget() 
+		#Content Layout
+		self.container = QWidget()
 
-		self.scrollArea = QScrollArea() 
-		self.scrollArea.setWidget(self.container)           
+		self.scrollArea = QScrollArea()
+		self.scrollArea.setWidget(self.container)
 
-		layout.addWidget(self.scrollArea)   
+		layout.addWidget(self.scrollArea)
 
 		self.scrollArea.setWidgetResizable(True)
 
-		gridLayout = QGridLayout() 
-		self.container.setLayout(gridLayout) 
+		gridLayout = QGridLayout()
+		self.container.setLayout(gridLayout)
 
 		i = 0
 		self.name = QLineEdit(self)
@@ -502,7 +470,7 @@ class NewVenueWindow(QMainWindow):
 		self.state = QLineEdit(self)
 		self.state.setPlaceholderText("State")
 		gridLayout.addWidget(self.state, i, 1)
-		
+
 		i += 1
 		self.zip = QLineEdit(self)
 		self.zip.setPlaceholderText("Zip")
@@ -510,7 +478,7 @@ class NewVenueWindow(QMainWindow):
 		self.phone = QLineEdit(self)
 		self.phone.setPlaceholderText("Phone")
 		gridLayout.addWidget(self.phone, i, 1)
-		
+
 		i += 1
 		self.twitter = QLineEdit(self)
 		self.twitter.setPlaceholderText("Twitter")
@@ -528,7 +496,7 @@ class NewVenueWindow(QMainWindow):
 		self.category = CategorySelector(self)
 		gridLayout.addWidget(self.category, i, 0, 2, 2)
 		i += 1
-		
+
 		i += 1
 		self.ll = QLineEdit(self)
 		self.ll.setPlaceholderText("Coordinates")
@@ -539,8 +507,8 @@ class NewVenueWindow(QMainWindow):
 		i += 1
 		self.add_venue_button = QPushButton("Add Venue")
 		self.connect(self.add_venue_button, SIGNAL("clicked()"), self.add_venue)
-		gridLayout.addWidget(self.add_venue_button, i, 0, 1 ,2)
-		
+		gridLayout.addWidget(self.add_venue_button, i, 0, 1, 2)
+
 	def category_selected(self, index):
 		if index != -1:
 			subcategories = self.category.pickSelector().model().get_data(index)[u'categories']
@@ -572,18 +540,17 @@ class NewVenueWindow(QMainWindow):
 		if 'ignoreDuplicatesKey' in self.venue:
 			venue['ignoreDuplicatesKey'] = self.venue['ignoreDuplicatesKey']
 
-
 		response = foursquare.venue_add(venue)
 
 		if response[u'meta'][u'code'] == 409:
 			title = "Duplicate detected"
-	
+
 			venues = dict()
 			i = 0
 			for venue in response[u'response'][u'candidateDuplicateVenues']:
 				venues[i] = dict()
 				venues[i][u'venue'] = venue
-				i +=  1
+				i += 1
 
 			msgBox = QMessageBox(self)
 			msgBox.setText("Foursquare says this venue looks like a duplicate.<br> Make sure it isn't; if it is, then click \"Add Venue\" again.")

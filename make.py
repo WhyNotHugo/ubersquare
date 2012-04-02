@@ -1,6 +1,6 @@
 #!/usr/bin/python2.5
 # -*- coding: utf-8 -*-
-VERSION="0.3.3"
+VERSION="0.3.7"
 
 from distutils.core import setup
 from subprocess import call
@@ -23,7 +23,7 @@ setup(name='ubersquare',
       url='http://ubertech.com.ar/square',
       author='Hugo Osvaldo Barrera',
       author_email='hugo@osvaldobarrera.com.ar',
-      packages=['ubersquare', 'ubersquare.venues', 'ubersquare.checkins'],
+      packages=['ubersquare'],
       license='BSD'
 )
 

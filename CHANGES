@@ -18,3 +18,15 @@
 + Leaving tips now works
 + Categories have icons everywhere
 + Slightly improved venue details screen (still WIP though)
+0.3.5
+* Idle threads don't keep running forever
+* Improved venue-related code
++ Added a "please wait" dialog to some screens that seemed to just freeze
++ Friends profile can be seen (though this is WIP). Profiles feature:
+ + Checkin count, mayorship count, and badge count.
+ + Quickly checkin with your friends!
++ Minor UI fixes on most areas
+0.3.6
++ Fixed searching with non-english characters
+0.3.7
+* Stats are properly updated when touching the profile pic/stats
