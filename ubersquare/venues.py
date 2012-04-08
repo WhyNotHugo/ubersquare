@@ -46,18 +46,24 @@ class VenueListModel(QAbstractListModel):
 			name = venue[u'name']
 			if len(name) > 72:
 				name = name[0:70]
+			address = "(no address)"
 			if u'address' in venue[u'location']:
 				address = venue[u'location'][u'address']
 				if len(address) > 72:
 					address = address[0:70]
-				return name + "\n  " + address
-			else:
-				return name
+			distance = ""
+			if u'distance' in venue[u'location']:
+				distance = " (" + str(venue[u'location'][u'distance']) + " metres away)"
+			return name + "\n  " + address + distance
 		elif role == Qt.DecorationRole:
 			if len(venue[u'categories']) > 0:
 				prefix = venue[u'categories'][0][u'icon'][u'prefix']
 				extension = venue[u'categories'][0][u'icon'][u'name']
-				return QIcon(foursquare.image(prefix + "64" + extension))
+				image_url = prefix + "64" + extension
+			else:
+				image_url = "https://foursquare.com/img/categories/none_64.png"
+			return QIcon(foursquare.image(image_url))
+			
 		elif role == VenueListModel.VenueRole:
 			return venue
 
@@ -293,11 +299,11 @@ class VenueDetailsWindow(UberSquareWindow):
 
 		if u'description' in venue:
 			i += 1
-			gridLayout.addWidget(QLabel(venue[u'description'], self), i, 0, 1, 2)
+			description_label = QLabel(venue[u'description'])
+			description_label.setWordWrap(True)
+			gridLayout.addWidget(description_label, self, i, 0, 1, 2)
 			i += 1
-			line = QFrame()
-			line.setFrameShape(QFrame.HLine)
-			gridLayout.addWidget(line, i, 0, 1, 2)
+			gridLayout.addWidget(Rules(), i, 0, 1, 2)
 
 		i += 1
 		gridLayout.addWidget(QLabel(times, self), i, 0)

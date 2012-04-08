@@ -30,3 +30,6 @@
 + Fixed searching with non-english characters
 0.3.7
 * Stats are properly updated when touching the profile pic/stats
+* Minor UI fixes in venues screen
+* Distance to venues (in venue lists) is show (if available)
+* Added some more info to the readme
