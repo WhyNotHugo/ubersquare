@@ -1,6 +1,7 @@
 # UberSquare
 
 Ubersquare is a foursquare application maemo, written in Python 2.5 using PySide.
+Be warned that a great deal of the source could use *a lot* of refactoring, and probibly will be refactored at some point.
 
 ## Building
 
