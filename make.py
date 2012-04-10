@@ -1,6 +1,6 @@
 #!/usr/bin/python2.5
 # -*- coding: utf-8 -*-
-VERSION="0.3.7"
+VERSION="0.3.8"
 
 from distutils.core import setup
 from subprocess import call
