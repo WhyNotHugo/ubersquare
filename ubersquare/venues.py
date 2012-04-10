@@ -301,7 +301,7 @@ class VenueDetailsWindow(UberSquareWindow):
 			i += 1
 			description_label = QLabel(venue[u'description'])
 			description_label.setWordWrap(True)
-			gridLayout.addWidget(description_label, self, i, 0, 1, 2)
+			gridLayout.addWidget(description_label, i, 0, 1, 2)
 			i += 1
 			gridLayout.addWidget(Rules(), i, 0, 1, 2)
 

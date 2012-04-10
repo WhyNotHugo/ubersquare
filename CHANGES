@@ -27,9 +27,11 @@
  + Quickly checkin with your friends!
 + Minor UI fixes on most areas
 0.3.6
-+ Fixed searching with non-english characters
++ Searching with non-english characters now works
 0.3.7
 * Stats are properly updated when touching the profile pic/stats
 * Minor UI fixes in venues screen
-* Distance to venues (in venue lists) is show (if available)
-* Added some more info to the readme
++ Distance to venues (in venue lists) is show (if available)
++ Added some more info to the readme
+0.3.8
+* Fixed regression where venues that had their details fetched were no longer available.
