@@ -2,7 +2,7 @@
 
 # Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>
 #
-# Permission to use, copy, modify, and distribute this software for any
+# Permission todo use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
 # copyright notice and this permission notice appear in all copies.
 #
@@ -25,9 +25,9 @@ import os
 from urlparse import urlparse
 from xdg import BaseDirectory
 
-CLIENT_ID = "A0IJ0P4EFRO50JUEYALJDGR52RDS0O4H1OKPSIEYZ5LHSNGH"
+CLIENT_ID     = "A0IJ0P4EFRO50JUEYALJDGR52RDS0O4H1OKPSIEYZ5LHSNGH"
 CLIENT_SECRET = "ACDUWAODBXRUPXHMVVWOXXATFN0PM0GP2PSLI5MZZCTUQ2TV"
-CALLBACK_URI = "http://localhost:6060/auth"
+CALLBACK_URI  = "http://localhost:6060/auth"
 
 authData = dict()
 
@@ -36,6 +36,8 @@ API_VERSION = "20120208"
 DEBUG = False
 
 DefaultFetchAmount = 25
+
+BROADCAST_DEFAULT = "public"
 
 cache_dir = os.path.join(BaseDirectory.xdg_cache_home, "ubersquare/")
 image_dir = os.path.join(BaseDirectory.xdg_data_home, "ubersquare/images/")
@@ -167,6 +169,8 @@ def foursquare_post(path, params):
 	allParams = dict([k, v.encode('utf-8')] for k, v in allParams.items())
 	allParams = urllib.urlencode(allParams)
 
+	debug_json(allParams)
+
 	resource = urllib.urlopen(BASE_URL + path, allParams)
 	response = json.load(resource, "UTF-8")
 	return response
@@ -248,12 +252,30 @@ def get_venue(venueId):
 		return response[u'response'][u'venue']
 
 
+# TODO: make this entire file OO, and this an actual attribute of it
+checkin_hooks = list()
 def checkin(venue, ll, shout=""):
 	"""
 	Checks in the user at venue with lat/lng ll
 	"""
-	response = foursquare_post("/checkins/add", {'shout': shout, 'venueId': venue[u'id'], 'broadcast': "public,facebook", 'll': ll})
+	broadcast = config_get("broadcast")
+	if broadcast == None:
+		broadcast = BROADCAST_DEFAULT
+
+	print "Checking in with broadcast = " + broadcast
+
+	response = foursquare_post("/checkins/add", {'shout': shout, 'venueId': venue[u'id'], 'broadcast': broadcast, 'll': ll})
+
+	# This is, without doubt, the nastiest hack I've ever done!
+	print len(checkin_hooks)
+	for hook in checkin_hooks:
+		hook()
+	
 	return response
+
+
+def add_checkin_hook(hook):
+	checkin_hooks.append(hook)
 
 
 def get_last_ll():
@@ -318,7 +340,11 @@ def __delete_venue_with_tip(tipId):
 	conn.close()
 
 
-def tip_add(venueId, text, url="", broadcast=""):
+def tip_add(venueId, text, url=""):
+	broadcast = config_get("broadcast")
+	if broadcast == None:
+		broadcast = BROADCAST_DEFAULT
+
 	response = foursquare_post("/tips/add", {'venueId': venueId, 'text': text, 'url': url, 'broadcast': broadcast})
 	return response
 
