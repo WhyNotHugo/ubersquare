@@ -1,6 +1,7 @@
 #!/usr/bin/python2.5
 # -*- coding: utf-8 -*-
-VERSION="0.3.8"
+VERSION="0.4.0"
+BUILD="1"
 
 from distutils.core import setup
 from subprocess import call
@@ -47,7 +48,7 @@ p.distribution="fremantle"
 p.repository="extras-devel"
 p.xsbc_bugtracker="http://bugs.maemo.org"
 version = VERSION
-build = "1"
+build = BUILD
 changeloginformation = open("CHANGES").read() 
 dir_name = "package"
 for root, dirs, files in os.walk(dir_name):
