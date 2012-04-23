@@ -35,3 +35,11 @@
 + Added some more info to the readme
 0.3.8
 * Fixed regression where venues that had their details fetched were no longer available.
+0.3.9
++ Added a very poorly designed settings page with broadcast settings
+0.4.0
+* Main UI redesigned
++ Last checkin is visible on the main screen (At last!)
+- Removed the useless "settings" button from the menubar
++ Renamed and improved the "Sharing" dialog.
++ Some minor tweaks here and there
