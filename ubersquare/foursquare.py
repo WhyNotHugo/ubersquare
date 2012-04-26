@@ -254,13 +254,14 @@ def get_venue(venueId):
 
 # TODO: make this entire file OO, and this an actual attribute of it
 checkin_hooks = list()
-def checkin(venue, ll, shout=""):
+def checkin(venue, ll, shout="", broadcast=None):
 	"""
 	Checks in the user at venue with lat/lng ll
 	"""
-	broadcast = config_get("broadcast")
-	if broadcast == None:
-		broadcast = BROADCAST_DEFAULT
+	if not broadcast:
+		broadcast = config_get("broadcast")
+		if broadcast == None:
+			broadcast = BROADCAST_DEFAULT
 
 	print "Checking in with broadcast = " + broadcast
 
