@@ -88,10 +88,14 @@ class Profile(QWidget):
         mayorships = "<b>" + str(self.user[u'mayorships'][u'count']) + "</b> mayorships"
         checkins = "<b>" + str(self.user[u'checkins'][u'count']) + "</b> checkins"
 
-        location = self.user[u'checkins'][u'items'][0][u'venue'][u'name']
-        lastSeen = self.user[u'checkins'][u'items'][0][u'createdAt']
-        lastSeen = datetime.fromtimestamp(lastSeen).strftime("%Y-%m-%d %X")
-        location = "Last seen @" +  location # + "</b>, at <i>" + lastSeen + "</i>"
+        if u'items' in self.user[u'checkins']:
+            location = self.user[u'checkins'][u'items'][0][u'venue'][u'name']
+            lastSeen = self.user[u'checkins'][u'items'][0][u'createdAt']
+            lastSeen = datetime.fromtimestamp(lastSeen).strftime("%Y-%m-%d %X")
+            location = "Last seen @" +  location # + "</b>, at <i>" + lastSeen + "</i>"
+        else:
+            location = "Never checked in anywhere!"
+
 
         text = location + "<br>" + badges + " | " + mayorships + " | " + checkins
         self.textLabel.setText(text)
