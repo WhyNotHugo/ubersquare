@@ -345,7 +345,7 @@ def get_venues_categories(readCache=CacheOrGet):
 def venue_add(venue, ignoreDuplicates=False, ignoreDuplicatesKey=None):
 	"""
 	required: name, ll
-	optional: address, crossAddress, city, state, zip, phone, twitter, primaryCategoryId, description, url
+	optional: address, crossStreet, city, state, zip, phone, twitter, primaryCategoryId, description, url
 	second_run: ignoreDuplicates, ignoreDuplicatesKey
 	"""
 	response = foursquare_post("venues/add", venue)

@@ -465,9 +465,9 @@ class NewVenueWindow(QMainWindow):
 		self.address = QLineEdit(self)
 		self.address.setPlaceholderText("Address")
 		gridLayout.addWidget(self.address, i, 0)
-		self.crossAddress = QLineEdit(self)
-		self.crossAddress.setPlaceholderText("Cross Address")
-		gridLayout.addWidget(self.crossAddress, i, 1)
+		self.crossStreet = QLineEdit(self)
+		self.crossStreet.setPlaceholderText("Cross Address")
+		gridLayout.addWidget(self.crossStreet, i, 1)
 
 		i += 1
 		self.city = QLineEdit(self)
@@ -532,7 +532,7 @@ class NewVenueWindow(QMainWindow):
 		venue['name'] = self.name.text()
 		venue['ll'] = self.ll.text()
 		venue['address'] = self.address.text()
-		venue['crossAddress'] = self.crossAddress.text()
+		venue['crossStreet'] = self.crossStreet.text()
 		venue['city'] = self.city.text()
 		venue['state'] = self.state.text()
 		venue['zip'] = self.zip.text()
