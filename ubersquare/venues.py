@@ -416,11 +416,11 @@ class VenueDetailsWindow(UberSquareWindow):
 	def checkin(self):
 		c = CheckinConfirmation(self, self.venue)
 		c.exec_()
-		if c.buttonRole(c.clickedButton()) == QMessageBox.YesRole:
+		if c.result() == QDialog.Accepted:
 			try:
 				# TODO: do this in a separate thread
 				ll = LocationProvider().get_ll(self.venue)
-				response = foursquare.checkin(self.venue, ll, self.shout_text.text())
+				response = foursquare.checkin(self.venue, ll, self.shout_text.text(), c.broadcast())
 				CheckinDetails(self, response).show()
 			except IOError:
 				self.networkError.emit()
