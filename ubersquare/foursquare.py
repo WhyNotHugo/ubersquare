@@ -25,24 +25,38 @@ import os
 from urlparse import urlparse
 from xdg import BaseDirectory
 
+###################
+# LOCAL CONSTANTS #
+###################
+
 CLIENT_ID     = "A0IJ0P4EFRO50JUEYALJDGR52RDS0O4H1OKPSIEYZ5LHSNGH"
 CLIENT_SECRET = "ACDUWAODBXRUPXHMVVWOXXATFN0PM0GP2PSLI5MZZCTUQ2TV"
 CALLBACK_URI  = "http://localhost:6060/auth"
-
-authData = dict()
 
 BASE_URL = "https://api.foursquare.com/v2/"
 API_VERSION = "20120208"
 DEBUG = False
 
-DefaultFetchAmount = 25
-
 BROADCAST_DEFAULT = "public"
 
+####################
+# GLOBAL CONSTANTS #
+####################
+
+DEFAULT_FETCH_AMOUNT = 25
+
+#########################
+# FILES AND DIRECTORIES #
+#########################
+
+# Directory that contains the cache
 cache_dir = os.path.join(BaseDirectory.xdg_cache_home, "ubersquare/")
+# Directory that contains cached images
 image_dir = os.path.join(BaseDirectory.xdg_data_home, "ubersquare/images/")
+# Directory that contains the configuration
 config_dir = os.path.join(BaseDirectory.xdg_config_home, "ubersquare/")
 
+# Create missing directories
 if not os.path.exists(cache_dir):
 	os.makedirs(cache_dir)
 if not os.path.exists(image_dir):
@@ -50,19 +64,31 @@ if not os.path.exists(image_dir):
 if not os.path.exists(config_dir):
 	os.makedirs(config_dir)
 
-query_cache = cache_dir + "cache.sqlite"
-if not os.path.exists(query_cache):
+def create_cache_db():
 	conn = sqlite3.connect(query_cache)
 	conn.execute("CREATE TABLE IF NOT EXISTS queries (resource TEXT PRIMARY KEY, value TEXT)")
-	#conn.execute("CREATE TABLE IF NOT EXISTS tips (tipId TEXT PRIMARY KEY, venueID TEXT, done BOOLEAN, todo BOOLEAN, tipText TEXT)")
 	conn.close()
 
-config = config_dir + "config.sqlite"
-if not os.path.exists(config):
+def create_config_db():
 	conn = sqlite3.connect(config)
 	conn.execute("CREATE TABLE IF NOT EXISTS config (property TEXT PRIMARY KEY, value TEXT)")
 	conn.close()
 
+
+
+query_cache = cache_dir + "cache.sqlite"
+if not os.path.exists(query_cache):
+	create_cache_db();
+
+config = config_dir + "config.sqlite"
+if not os.path.exists(config):
+	create_config_db()
+	
+authData = dict()
+
+#######################
+# AUX DEBUG FUNCTIONS #
+#######################
 
 def debug(string):
 	print string
@@ -70,6 +96,14 @@ def debug(string):
 
 def debug_json(string):
 	print json.dumps(string, sort_keys=True, indent=4)
+
+def cacheModeToString(cacheMode):
+	if cacheMode == CacheOnly:
+		return "Get from cache or return null"
+	elif cacheMode == CacheIfPosible:
+		return "Get from cache or foursquare"
+	elif cacheMode == NoCache:
+		return "Don't read from cache"
 
 ####################
 # CACHE/FOURSQUARE #
@@ -103,7 +137,10 @@ def config_get(property):
 	return value
 
 
-# True and False are to mantain some legacy code, but *will* be deprecated.
+# All these values are used throughout the system, but the class Cache
+# should override them all, and these six fields should dissapear
+
+# Usage of True/False has to be purged everywhere as well, that's really old code!
 CacheOnly = 3
 CacheIfPosible = True
 NoCache = False
@@ -119,16 +156,10 @@ class Cache:
 	ForceFetch = False
 
 
-def cacheModeToString(cacheMode):
-	if cacheMode == CacheOnly:
-		return "Get from cache or return null"
-	elif cacheMode == CacheIfPosible:
-		return "Get from cache or foursquare"
-	elif cacheMode == NoCache:
-		return "Don't read from cache"
-
-
 def foursquare_get(path, params, read_cache=False, callback=None):
+	"""
+	Performs an HTTP get on PATH.
+	"""
 	commonParams = {'oauth_token': authData['ACCESS_TOKEN'], 'v': API_VERSION}
 	allParams = urllib.urlencode(dict(commonParams.items() + params.items()))
 
@@ -210,6 +241,11 @@ def build_venue_array(source):
 	return venues
 
 ###############################################################################
+# All these method names need refactoring.  They should be similar to the foursquare API,
+# ie: calls to endpoint "user/$UID/tips" should be user_tips(uid)
+
+# Better still, there should be actual objects to do this;
+# users.tips(uid)
 
 
 def get_history(read_cache):
@@ -394,6 +430,6 @@ def init():
 
 if __name__ == "__main__":
 	print "This is the foursquare API library, you're not supposed to run this!"
-	sys.exit()
+	sys.exit(0)
 else:
 	init()

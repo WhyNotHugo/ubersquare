@@ -275,9 +275,9 @@ class MainWindow(UberSquareWindow):
         ll = LocationProvider().get_ll()
 
         try:
-            venues = foursquare.venues_search(venueName, ll, categoryId, foursquare.DefaultFetchAmount, foursquare.CacheOrNull)
+            venues = foursquare.venues_search(venueName, ll, categoryId, foursquare.DEFAULT_FETCH_AMOUNT, foursquare.CacheOrNull)
             v = VenueListWindow("Search results", venues, self)
-            t = VenueSearchThread(v, foursquare.venues_search, venueName, ll, categoryId, foursquare.DefaultFetchAmount, self)
+            t = VenueSearchThread(v, foursquare.venues_search, venueName, ll, categoryId, foursquare.DEFAULT_FETCH_AMOUNT, self)
             t.start()
             if venues:
                 v.show()
