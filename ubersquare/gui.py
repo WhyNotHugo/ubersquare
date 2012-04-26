@@ -377,7 +377,7 @@ class SearchDialog(QDialog):
 
         self.categorySelector = CategorySelector()
 
-        layout.addWidget(self.categorySelector, 0, 0)
+        layout.addWidget(self.categorySelector, 0, 0, 1, 2)
         layout.addWidget(self.searchQuery, 1, 0)
         layout.addWidget(button, 1, 1)
 
