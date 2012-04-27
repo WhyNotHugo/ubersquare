@@ -40,6 +40,7 @@ class CheckinConfirmation(QDialog):
             text += ", " + venue[u'location'][u'address']
         text += "."
         textLabel = QLabel(text, self)
+        textLabel.setWordWrap(True)
 
         okButton = QPushButton("Ok")
         self.connect(okButton, SIGNAL("clicked()"), self.accept)
