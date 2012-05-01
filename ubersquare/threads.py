@@ -153,10 +153,10 @@ class VenueDetailsThread(QThread):
 	def run(self):
 		try:
 			venue = foursquare.venues_venue(self.venueId, foursquare.ForceFetch)
-			if u'mayor' in venue:
-				if u'user' in venue[u'mayor']:
+			if 'mayor' in venue:
+				if 'user' in venue['mayor']:
 					print "there's a mayor!"
-					foursquare.image(venue[u'mayor'][u'user'][u'photo'])
+					foursquare.image(venue['mayor']['user']['photo'])
 			self.__parent.hideWaitingDialog.emit()
 			# This tiny sleep in necesary to (a) Avoid an Xorg warning, (b) achieve a smoother transition
 			time.sleep(0.15)
@@ -176,7 +176,7 @@ class UserDetailsThread(QThread):
 	def run(self):
 		try:
 			user = foursquare.get_user(self.userId, foursquare.ForceFetch)
-			photo = user[u'user'][u'photo']
+			photo = user['user']['photo']
 			foursquare.image(photo)
 			self.__parent.hideWaitingDialog.emit()
 			self.__parent.showUser.emit()
@@ -185,3 +185,41 @@ class UserDetailsThread(QThread):
 			self.__parent.networkError.emit()
 		self.exec_()
 		self.exit(0)
+
+
+#########################
+### NEW STYLE THREADS ###
+#########################
+# These threads are less reusable, but more robust, and have a far clearer interface, and code.
+# Aditionally, they can fetch data from cache synchronously, if available.
+#
+# In time, all threads will be like these ones
+
+class UserMayorships(QThread):
+	"""
+	Retrieves a user's mayorships. "parent" should implement:
+	the method
+	 - "setVenues"
+	the signals
+	 - "hideWaitingDialog"
+	 - "updateVenues"
+	 - "networkError"
+	"""
+	def __init__(self, venueWindow, userId, parent):
+		super(UserMayorships, self).__init__(parent)
+		self.__venueWindow = venueWindow
+		self.__userId = userId
+		self.__parent = parent
+
+	def run(self, cacheMode = foursquare.Cache.ForceFetch):
+		try:
+			self.__parent.setVenues(self.getVenues(cacheMode))
+			self.__parent.hideWaitingDialog.emit()
+			self.__venueWindow.updateVenues.emit()
+		except IOError:
+			self.__parent.networkError.emit()
+
+	def getVenues(self, cacheMode):
+		return foursquare.user_mayorships(self.__userId, cacheMode)
+
+

@@ -10,55 +10,81 @@ import sys
 import py2deb
 import shutil
 
+PKGNAME = "ubersquare"
+PKGDESC = "A foursquare client for maemo"
+
+AUTHOR_NAME  = "Hugo Osvaldo Barrera"
+AUTHOR_EMAIL = "hugo@osvaldobarrera.com.ar"
+
+WEBSITE = "https://github.com/hobarrera/UberSquare"
+
+
+####################################################
+### Make setuptools pack this as a python module ###
+####################################################
+
+# Nasty hack to make setuptools belive it was called with these arguments
 fakeargs = [sys.argv[0], "build", "bdist_dumb"]
 sys.argv = fakeargs
 
-try:
-	os.chdir(os.path.dirname(sys.argv[0]))
-except:
-	pass
+os.chdir(os.path.dirname(sys.argv[0]))
 
-setup(name='ubersquare',
-      version=VERSION,
-      description='A foursquare client for maemo',
-      url='http://ubertech.com.ar/square',
-      author='Hugo Osvaldo Barrera',
-      author_email='hugo@osvaldobarrera.com.ar',
-      packages=['ubersquare'],
-      license='BSD'
+setup(name         = PKGNAME,
+      version      = VERSION,
+      description  = PKGDESC,
+      url          = WEBSITE,
+      author       = AUTHOR_NAME,
+      author_email = AUTHOR_EMAIL,
+      packages     = ['ubersquare'],
+      license      = 'BSD'
 )
 
+########################################################################################
+### Prepare the files packed as a python modules to repack them into de .deb package ###
+########################################################################################
+
 shutil.rmtree("package/usr/lib")
-call(["tar", "-C", "package/", "-xzf", "dist/ubersquare-" + VERSION + ".linux-armv7l.tar.gz"])
+call(["tar", "-C", "package/", "-xzf", "dist/" + PKGNAME + "-" + VERSION + ".linux-armv7l.tar.gz"])
 shutil.rmtree("build")
 shutil.rmtree("dist")
 
+##########################################################################################
+### Create files necesary to create a .deb package using the previously unpacked files ###
+##########################################################################################
+
+# TODO: modify version on the .desktop file (using ConfigParser would work)
+
 print
-p=py2deb.Py2deb("ubersquare")
-p.description="A foursquare client for maemo."
-p.author="Hugo Osvaldo Barrera"
+p=py2deb.Py2deb(PKGNAME)
+p.description=PKGDESC
+p.author=AUTHOR_NAME
 p.license="bsd"
-p.mail="hugo@osvaldobarrera.com.ar"
+p.mail=AUTHOR_EMAIL
 p.depends = "python2.5, python-pyside, python-simplejson, python-xdg, python-location"
 p.section="user/navigation"
-#p.icon = "/home/user/MyDocs/mclock/mClock.png"
+p.icon = "/usr/share/icons/hicolor/26x26/apps/foursquare.png"
 p.arch="all"
 p.urgency="low"
 p.distribution="fremantle"
 p.repository="extras-devel"
 p.xsbc_bugtracker="http://bugs.maemo.org"
-version = VERSION
-build = BUILD
-changeloginformation = open("CHANGES").read() 
 dir_name = "package"
 for root, dirs, files in os.walk(dir_name):
-	real_dir = "/" + root[len(dir_name):]
-	fake_file = []
-	for f in files:
-		fake_file.append(root + os.sep + f + "|" + f)
-	if len(fake_file) > 0:
-		p[real_dir] = fake_file
+    real_dir = "/" + root[len(dir_name):]
+    fake_file = []
+    for f in files:
+        fake_file.append(root + os.sep + f + "|" + f)
+    if len(fake_file) > 0:
+        p[real_dir] = fake_file
 print p
-r = p.generate(version,build,changelog=changeloginformation,tar=True,dsc=True,changes=True,build=False,src=True)
+p.generate(version      = VERSION,
+           buildversion = BUILD,
+           changelog    = open("CHANGES").read(),
+           tar          = True,
+           dsc          = True,
+           changes      = True,
+           build        = False,
+           src          = True
+)
 
 print "Done!"

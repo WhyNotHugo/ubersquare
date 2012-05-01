@@ -57,15 +57,15 @@ class CategoryModel(QAbstractListModel):
 
 	def data(self, index, role=Qt.DisplayRole):
 		if role == Qt.DisplayRole:
-			return self.categories[index.row()][u'name']
+			return self.categories[index.row()]['name']
 		elif role == Qt.DecorationRole:
-			prefix = self.categories[index.row()][u'icon'][u'prefix']
-			extension = self.categories[index.row()][u'icon'][u'name']
+			prefix = self.categories[index.row()]['icon']['prefix']
+			extension = self.categories[index.row()]['icon']['name']
 			return QIcon(foursquare.image(prefix + "64" + extension))
 		elif role == CategoryModel.CategoryRole:
 			return self.categories[index.row()]
 		elif role == CategoryModel.SubCategoriesRole:
-			return self.categories[index.row()][u'categories']
+			return self.categories[index.row()]['categories']
 
 	def get_data(self, index):
 		return self.categories[index]
@@ -94,7 +94,7 @@ class CategorySelector(QWidget):
 
 	def category_selected(self, index):
 		if index != -1:
-			subcategories = self.category.pickSelector().model().get_data(index)[u'categories']
+			subcategories = self.category.pickSelector().model().get_data(index)['categories']
 			self.subcategory.setPickSelector(CategoryPickSelector(subcategories))
 
 	def selectedCategory(self):
@@ -102,11 +102,11 @@ class CategorySelector(QWidget):
 		if self.subcategory.pickSelector():
 			index = self.subcategory.pickSelector().currentIndex()
 			if index > -1:
-				return self.subcategory.pickSelector().model().get_data(index)[u'id']
+				return self.subcategory.pickSelector().model().get_data(index)['id']
 
 		index = self.category.pickSelector().currentIndex()
 		if index > -1:
-			return self.category.pickSelector().model().get_data(index)[u'id']
+			return self.category.pickSelector().model().get_data(index)['id']
 
 		return ""
 
@@ -144,7 +144,7 @@ class UberSquareWindow(QMainWindow):
 		self.waitDialog.hide()
 		d = QMessageBox()
 		d.setWindowTitle("Network Error")
-		d.setText("I couldn't connect to foursquare to retrieve data. Make sure you're connected to the internet, and try again (keep in mind that it may have been just a network glitch).")
+		d.setText("I couldn't connect to foursquare to retrieve data. Make sure yo're connected to the internet, and try again (keep in mind that it may have been just a network glitch).")
 		d.addButton("Ok", QMessageBox.YesRole)
 		d.exec_()
 

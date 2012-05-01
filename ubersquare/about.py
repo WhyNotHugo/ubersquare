@@ -22,7 +22,8 @@ class AboutDialog(QDialog):
 	def __init__(self, parent=None):
 		super(AboutDialog, self).__init__(parent)
 		title = "About UberSquare"
-		aboutText = "UberSquare is a foursquare for maemo, specifically, for the Nokia N900.  Be sure to report any bugs you may find, and feel free to email me if you have any suggestions, etc."
+		aboutText = "UberSquare is a foursquare for maemo, specifically, for the Nokia N900."
+		aboutText += "  Be sure to report any bugs you may find, and feel free to email me if you have any suggestions, etc."
 
 		bsdLicense = """
 Copyright (c) 2012 Hugo Osvaldo Barrera <hugo@osvaldobarrera.com.ar>

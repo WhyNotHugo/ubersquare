@@ -122,8 +122,8 @@ class LastCheckinLocationProvider:
 		if not ll:
 			ll = foursquare.get_last_ll()
 		if venue:
-			lat = "%2.8f" % venue[u'location'][u'lat']
-			lng = "%2.8f" % venue[u'location'][u'lng']
+			lat = "%2.8f" % venue['location']['lat']
+			lng = "%2.8f" % venue['location']['lng']
 			foursquare.config_set("last_ll", lat + "," + lng)
 		return ll
 
@@ -141,10 +141,10 @@ class AproximateVenueLocationProvider:
 	def get_ll(self, venue=None):
 		if not venue:
 			return LastCheckinLocationProvider().get_ll()
-		venueId = venue[u'id']
-		lat = float((ord(venueId[0]) + (ord(venueId[1]) * 100))) / (10000 * 10000) + venue[u'location'][u'lat']
+		venueId = venue['id']
+		lat = float((ord(venueId[0]) + (ord(venueId[1]) * 100))) / (10000 * 10000) + venue['location']['lat']
 		lat = "%2.8f" % lat
-		lng = float((ord(venueId[2]) + (ord(venueId[3]) * 100))) / (10000 * 10000) + venue[u'location'][u'lng']
+		lng = float((ord(venueId[2]) + (ord(venueId[3]) * 100))) / (10000 * 10000) + venue['location']['lng']
 		lng = "%2.8f" % lng
 		ll = lat + "," + lng
 		print ll

@@ -233,9 +233,9 @@ def build_venue_array(source):
 	venues = dict()
 	i = 0
 	for venue in source:
-		if u'beenHere' in venue:
+		if 'beenHere' in venue:
 			 # Dirty, but the the model is too much in use to avoid this at 4am
-			venue[u'venue'][u'beenHere'] = venue[u'beenHere']
+			venue['venue']['beenHere'] = venue['beenHere']
 		venues[i] = venue
 		i += 1
 	return venues
@@ -251,13 +251,13 @@ def build_venue_array(source):
 def get_history(read_cache):
 	response = foursquare_get("users/self/venuehistory", {}, read_cache)
 	if response:
-		return build_venue_array(response[u'response'][u'venues'][u'items'])
+		return build_venue_array(response['response']['venues']['items'])
 
 
 def lists_todos(read_cache):
 	response = foursquare_get("lists/self/todos", {}, read_cache)
 	if response:
-		return build_venue_array(response[u'response'][u'list'][u'listItems'][u'items'])
+		return build_venue_array(response['response']['list']['listItems']['items'])
 
 
 def venues_search(query, ll, category, limit, read_cache):
@@ -265,10 +265,10 @@ def venues_search(query, ll, category, limit, read_cache):
 	if response:
 		venues = dict()
 		i = 0
-		for venue in response[u'response'][u'venues']:
+		for venue in response['response']['venues']:
 			# Esto puede parecer cualquiera, pero es para que tenga el mismo formato que los dem&aacute;s, y sean todas las listas iguales
 			venues[i] = dict()
-			venues[i][u'venue'] = venue
+			venues[i]['venue'] = venue
 			i += 1
 		return venues
 
@@ -279,13 +279,13 @@ def get_user(uid, read_cache):
 	"""
 	response = foursquare_get("users/" + uid, {}, read_cache)
 	if response:
-		return response[u'response']
+		return response['response']
 
 
 def get_venue(venueId):
 	response = foursquare_get("/venues/%s?" % venueId, {})
 	if response:
-		return response[u'response'][u'venue']
+		return response['response']['venue']
 
 
 # TODO: make this entire file OO, and this an actual attribute of it
@@ -301,7 +301,7 @@ def checkin(venue, ll, shout="", broadcast=None):
 
 	print "Checking in with broadcast = " + broadcast
 
-	response = foursquare_post("/checkins/add", {'shout': shout, 'venueId': venue[u'id'], 'broadcast': broadcast, 'll': ll})
+	response = foursquare_post("/checkins/add", {'shout': shout, 'venueId': venue['id'], 'broadcast': broadcast, 'll': ll})
 
 	# This is, without doubt, the nastiest hack I've ever done!
 	print len(checkin_hooks)
@@ -320,10 +320,10 @@ def get_last_ll():
 	Returns the ll of the user's last checkin
 	"""
 	ll = dict()
-	for item in get_user("self", False)[u'user'][u'checkins'][u'items']:
-		if item[u'type'] == "checkin":
-			ll['lat'] = item[u'venue'][u'location'][u'lat']
-			ll['lng'] = item[u'venue'][u'location'][u'lng']
+	for item in get_user("self", False)['user']['checkins']['items']:
+		if item['type'] == "checkin":
+			ll['lat'] = item['venue']['location']['lat']
+			ll['lng'] = item['venue']['location']['lng']
 	if 'lat' in ll:
 		ll = "%(lat)2.6f,%(lng)2.6f" % ll
 	else:
@@ -339,7 +339,7 @@ def get_venues_categories(readCache=CacheOrGet):
 	"""
 	response = foursquare_get("venues/categories", {}, readCache)
 	if response:
-		return response[u'response'][u'categories']
+		return response['response']['categories']
 
 
 def venue_add(venue, ignoreDuplicates=False, ignoreDuplicatesKey=None):
@@ -356,13 +356,13 @@ def venues_venue(venueId, readCache=CacheIfPosible):
 	response = foursquare_get("venues/" + venueId, {}, readCache)
 	if response:
 		#response > venue > tips > groups [] > items [] >
-		return response[u'response'][u'venue']
+		return response['response']['venue']
 
 
 def users_leaderboard(read_cache):
 	response = foursquare_get("users/leaderboard", {}, read_cache)
 	if response:
-		return response[u'response'][u'leaderboard'][u'items']
+		return response['response']['leaderboard']['items']
 
 
 def __delete_venue_with_tip(tipId):
@@ -403,17 +403,22 @@ def tip_markdone(tipId, marked):
 	__delete_venue_with_tip(tipId)
 	return response
 
+def user_mayorships(userId, read_cache):
+	response = foursquare_get("users/" + userId + "/mayorships", {}, read_cache)
+	if response:
+		return build_venue_array(response['response']['mayorships']['items'])
+
 ############################
 # Extra one-time functions #
 ############################
 
 
 def fetch_category_image(category):
-	prefix = category[u'icon'][u'prefix']
-	extension = category[u'icon'][u'name']
+	prefix = category['icon']['prefix']
+	extension = category['icon']['name']
 	image(prefix + "64" + extension)
-	if u'categories' in category:
-		for category in category[u'categories']:
+	if 'categories' in category:
+		for category in category['categories']:
 			fetch_category_image(category)
 
 
@@ -429,7 +434,7 @@ def init():
 	authData['ACCESS_TOKEN'] = config_get("access_token")
 
 if __name__ == "__main__":
-	print "This is the foursquare API library, you're not supposed to run this!"
+	print "This is the foursquare API library, yo're not supposed to run this!"
 	sys.exit(0)
 else:
 	init()
