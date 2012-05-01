@@ -35,7 +35,7 @@ from datetime import datetime
 class Profile(QWidget):
     def __init__(self, parent=None):
         super(Profile, self).__init__(parent)
-        self.user = foursquare.get_user("self", foursquare.CacheOrGet)[u'user']
+        self.user = foursquare.get_user("self", foursquare.CacheOrGet)['user']
         self.photo_label = QLabel()
 
         self.textLabel = QLabel()
@@ -43,10 +43,10 @@ class Profile(QWidget):
         self.__updateInfo(True)
 
         name = ""
-        if u'firstName' in self.user:
-            name += self.user[u'firstName'] + " "
-        if u'lastName' in self.user:
-            name += self.user[u'lastName']
+        if 'firstName' in self.user:
+            name += self.user['firstName'] + " "
+        if 'lastName' in self.user:
+            name += self.user['lastName']
 
         self.nameTitle = Title(name)
 
@@ -82,15 +82,15 @@ class Profile(QWidget):
     def __updateInfo(self, initial=False):
         if not initial:
             QMaemo5InformationBox.information(self, "Stats updated!", 1500)
-            self.user = foursquare.get_user("self", foursquare.CacheOrGet)[u'user']
+            self.user = foursquare.get_user("self", foursquare.CacheOrGet)['user']
 
-        badges = "<b>" + str(self.user[u'badges'][u'count']) + "</b> badges"
-        mayorships = "<b>" + str(self.user[u'mayorships'][u'count']) + "</b> mayorships"
-        checkins = "<b>" + str(self.user[u'checkins'][u'count']) + "</b> checkins"
+        badges = "<b>" + str(self.user['badges']['count']) + "</b> badges"
+        mayorships = "<b>" + str(self.user['mayorships']['count']) + "</b> mayorships"
+        checkins = "<b>" + str(self.user['checkins']['count']) + "</b> checkins"
 
-        if u'items' in self.user[u'checkins']:
-            location = self.user[u'checkins'][u'items'][0][u'venue'][u'name']
-            lastSeen = self.user[u'checkins'][u'items'][0][u'createdAt']
+        if 'items' in self.user['checkins']:
+            location = self.user['checkins']['items'][0]['venue']['name']
+            lastSeen = self.user['checkins']['items'][0]['createdAt']
             lastSeen = datetime.fromtimestamp(lastSeen).strftime("%Y-%m-%d %X")
             location = "Last seen @" +  location # + "</b>, at <i>" + lastSeen + "</i>"
         else:
@@ -100,7 +100,7 @@ class Profile(QWidget):
         text = location + "<br>" + badges + " | " + mayorships + " | " + checkins
         self.textLabel.setText(text)
 
-        self.photo = QImage(foursquare.image(self.user[u'photo']))
+        self.photo = QImage(foursquare.image(self.user['photo']))
         self.photo_label.setPixmap(QPixmap(self.photo))
 
 
@@ -242,7 +242,7 @@ class MainWindow(UberSquareWindow):
 
     def previous_venues_pushed(self):
         venues = foursquare.get_history(foursquare.CacheOrNull)
-        w = VenueListWindow("Previous Venues", venues, self)
+        w = VenueListWindow("Visited Venues", venues, self)
         t = VenueProviderThread(w, foursquare.get_history, self)
         t.start()
         if venues:
@@ -324,7 +324,7 @@ class SettingsDialog(UberSquareWindow):
         layout = QGridLayout(self.cw)
         layout.setContentsMargins(22, 22, 22, 22)
 
-        notice = "You'll need to link your facebook/twitter account from the foursquare website for these setting to have any effect."
+        notice = "Yo'll need to link your facebook/twitter account from the foursquare website for these setting to have any effect."
         notice += "  The foursquare API does not offer any means for applications to do this."
         label = QLabel(notice)
         label.setWordWrap(True)
@@ -416,7 +416,7 @@ def start():
         except IOError:
             d = QMessageBox()
             d.setWindowTitle("Network Error")
-            d.setText("I couldn't connect to foursquare to retrieve data. Make sure you're connected to the internet, and try again (keep in mind that it may have been just a network glitch).")
+            d.setText("I couldn't connect to foursquare to retrieve data. Make sure yo're connected to the internet, and try again (keep in mind that it may have been just a network glitch).")
             d.addButton("Ok", QMessageBox.YesRole)
             d.exec_()
 

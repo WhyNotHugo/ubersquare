@@ -46,7 +46,7 @@ def fetch_token():
 	url = urllib.urlopen(url)
 	response = url.read()
 	response = json.loads(response, "UTF-8")
-	foursquare.config_set("access_token", response[u'access_token'])
+	foursquare.config_set("access_token", response['access_token'])
 	foursquare.init()
 
 

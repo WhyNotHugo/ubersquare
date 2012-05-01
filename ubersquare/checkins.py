@@ -35,9 +35,9 @@ class CheckinConfirmation(QDialog):
         self.setLayout(layout)
 
 
-        text = "You're checking in @<b>" + venue[u'name'] + "</b>"
-        if u'address' in venue[u'location']:
-            text += ", " + venue[u'location'][u'address']
+        text = "You're checking in @<b>" + venue['name'] + "</b>"
+        if 'address' in venue['location']:
+            text += ", " + venue['location']['address']
         text += "."
         textLabel = QLabel(text, self)
         textLabel.setWordWrap(True)
@@ -83,20 +83,20 @@ class CheckinDetails(QDialog):
         mayorship = ""
         badge = ""
 
-        for item in checking_details[u'notifications']:
-            if item[u'type'] == "message":
-                message += item[u'item'][u'message'] + "<p>"
-            elif item[u'type'] == "score":
-                score += "Total points: %d" % item[u'item'][u'total']
-                for scoreItem in item[u'item'][u'scores']:
+        for item in checking_details['notifications']:
+            if item['type'] == "message":
+                message += item['item']['message'] + "<p>"
+            elif item['type'] == "score":
+                score += "Total points: %d" % item['item']['total']
+                for scoreItem in item['item']['scores']:
                     score += "<br>+%(points)d   %(message)s" % \
-                    {'points': scoreItem[u'points'], 'message': scoreItem[u'message']}
+                    {'points': scoreItem['points'], 'message': scoreItem['message']}
                 score += "<p>"
-            elif item[u'type'] == "mayorship":
-                mayorship = item[u'item'][u'message']
-            elif item[u'type'] == "badge":
-                print json.dumps(item[u'item'], sort_keys=True, indent=4)
-                badge = "You got the \"" + item[u'item'][u'name'] + "\" badge!"
+            elif item['type'] == "mayorship":
+                mayorship = item['item']['message']
+            elif item['type'] == "badge":
+                print json.dumps(item['item'], sort_keys=True, indent=4)
+                badge = "You got the \"" + item['item']['name'] + "\" badge!"
 
         text = message + score + mayorship + badge
 

@@ -28,6 +28,9 @@ import foursquare
 
 
 class VenueListModel(QAbstractListModel):
+	"""
+	The inner model user to contain the list of venues.
+	"""
 	def __init__(self, venues):
 		super(VenueListModel, self).__init__()
 		self.venues = venues
@@ -41,24 +44,24 @@ class VenueListModel(QAbstractListModel):
 			return 0
 
 	def data(self, index, role=Qt.DisplayRole):
-		venue = self.venues[index.row()][u'venue']
+		venue = self.venues[index.row()]['venue']
 		if role == Qt.DisplayRole:
-			name = venue[u'name']
+			name = venue['name']
 			if len(name) > 72:
 				name = name[0:70]
 			address = "(no address)"
-			if u'address' in venue[u'location']:
-				address = venue[u'location'][u'address']
+			if 'address' in venue['location']:
+				address = venue['location']['address']
 				if len(address) > 72:
 					address = address[0:70]
 			distance = ""
-			if u'distance' in venue[u'location']:
-				distance = " (" + str(venue[u'location'][u'distance']) + " metres away)"
+			if 'distance' in venue['location']:
+				distance = " (" + str(venue['location']['distance']) + " metres away)"
 			return name + "\n  " + address + distance
 		elif role == Qt.DecorationRole:
-			if len(venue[u'categories']) > 0:
-				prefix = venue[u'categories'][0][u'icon'][u'prefix']
-				extension = venue[u'categories'][0][u'icon'][u'name']
+			if len(venue['categories']) > 0:
+				prefix = venue['categories'][0]['icon']['prefix']
+				extension = venue['categories'][0]['icon']['name']
 				image_url = prefix + "64" + extension
 			else:
 				image_url = "https://foursquare.com/img/categories/none_64.png"
@@ -73,10 +76,12 @@ class VenueListModel(QAbstractListModel):
 
 
 class VenueList(QListView):
+	"""
+	The list widget, that actually shows the list of venues
+	"""
 	def __init__(self, parent, venues):
 		super(VenueList, self).__init__(parent)
 		self.model = VenueListModel(venues)
-		#self.setModel(self.model)
 
 		self.proxy = QSortFilterProxyModel(self)
 		self.proxy.setSourceModel(self.model)
@@ -87,7 +92,7 @@ class VenueList(QListView):
 
 	def venue_selected(self, index):
 		venue = self.proxy.data(index, VenueListModel.VenueRole)
-		cachedVenue = foursquare.venues_venue(venue[u'id'], foursquare.CacheOnly)
+		cachedVenue = foursquare.venues_venue(venue['id'], foursquare.CacheOnly)
 		if not cachedVenue:
 			d = VenueDetailsWindow(self, venue, False)
 		else:
@@ -146,15 +151,15 @@ class Tip(QWidget):
 		self.setLayout(gridLayout)
 		self.tip = tip
 
-		tipLabel = QLabel(tip[u'text'], self)
+		tipLabel = QLabel(tip['text'], self)
 		tipLabel.setWordWrap(True)
 		gridLayout.addWidget(tipLabel, 0, 0, 2, 1)
 
-		self.done_checkbox = QCheckBox("Done! (" + str(tip[u'done'][u'count']) + ")")
+		self.done_checkbox = QCheckBox("Done! (" + str(tip['done']['count']) + ")")
 		self.done_checkbox.setChecked(self.isTipDone())
 		self.done_checkbox.stateChanged.connect(self.markDone)
 
-		self.todo_checkbox = QCheckBox("To-do (" + str(tip[u'todo'][u'count']) + ")")
+		self.todo_checkbox = QCheckBox("To-do (" + str(tip['todo']['count']) + ")")
 		self.todo_checkbox.setChecked(self.isTipTodo())
 		self.todo_checkbox.stateChanged.connect(self.markTodo)
 
@@ -163,10 +168,10 @@ class Tip(QWidget):
 		gridLayout.setColumnStretch(0, 1)
 
 	def isTipInGroupType(self, groupType):
-		if u'listed' in self.tip:
-			if u'groups' in self.tip[u'listed']:
-				for group in self.tip[u'listed'][u'groups']:
-					if group[u'type'] == groupType:
+		if 'listed' in self.tip:
+			if 'groups' in self.tip['listed']:
+				for group in self.tip['listed']['groups']:
+					if group['type'] == groupType:
 						return True
 		return False
 
@@ -177,10 +182,10 @@ class Tip(QWidget):
 		return self.isTipInGroupType("todos")
 
 	def markTodo(self, state):
-		TipMarkTodoBackgroundThread(self.tip[u'id'], self.todo_checkbox.isChecked(), self).start()
+		TipMarkTodoBackgroundThread(self.tip['id'], self.todo_checkbox.isChecked(), self).start()
 
 	def markDone(self, state):
-		TipMarkDoneBackgroundThread(self.tip[u'id'], self.done_checkbox.isChecked(), self).start()
+		TipMarkDoneBackgroundThread(self.tip['id'], self.done_checkbox.isChecked(), self).start()
 
 
 class NewTipWidget(QWidget):
@@ -213,7 +218,7 @@ class VenueDetailsWindow(UberSquareWindow):
 
 		self.fullDetails = fullDetails
 
-		self.setWindowTitle(venue[u'name'])
+		self.setWindowTitle(venue['name'])
 
 		self.centralWidget = QWidget()
 		self.setCentralWidget(self.centralWidget)
@@ -237,44 +242,44 @@ class VenueDetailsWindow(UberSquareWindow):
 		self.container.setLayout(gridLayout)
 
 		# name
-		name = venue[u'name']
-		if len(venue[u'categories']) > 0:
-			name += " (" + venue[u'categories'][0][u'name'] + ")"
+		name = venue['name']
+		if len(venue['categories']) > 0:
+			name += " (" + venue['categories'][0]['name'] + ")"
 
 		# address
 		address = ""
-		if u'address' in venue[u'location']:
-			address = venue[u'location'][u'address']
+		if 'address' in venue['location']:
+			address = venue['location']['address']
 
-		if u'crossStreet' in venue[u'location']:
+		if 'crossStreet' in venue['location']:
 			if address != "":
 				address += ", "
-			address += venue[u'location'][u'crossStreet']
+			address += venue['location']['crossStreet']
 
 		# address2
 		address2 = ""
-		if u'postalCode' in venue[u'location']:
-			address2 = venue[u'location'][u'postalCode']
+		if 'postalCode' in venue['location']:
+			address2 = venue['location']['postalCode']
 
-		if u'city' in venue[u'location']:
+		if 'city' in venue['location']:
 			if address2 != "":
 				address2 += ", "
-			address2 += venue[u'location'][u'city']
+			address2 += venue['location']['city']
 
 		# times
-		if u'beenHere' in venue:
+		if 'beenHere' in venue:
 			if not fullDetails:
-				count = venue[u'beenHere']
+				count = venue['beenHere']
 			else:
-				count = venue[u'beenHere']['count']
-			times = "<b>You've been here "
+				count = venue['beenHere']['count']
+			times = "<b>Yo've been here "
 			if count == 1:
 				times += "once"
 			else:
 				times += str(count) + " times"
 			times += "</b>"
 		else:
-			times = "<b>You've never been here</b>"
+			times = "<b>Yo've never been here</b>"
 
 		checkin_button = QPushButton("Check-in")
 		self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
@@ -290,16 +295,16 @@ class VenueDetailsWindow(UberSquareWindow):
 		gridLayout.addWidget(QLabel(address, self), i, 0, 1, 2)
 		i += 1
 		gridLayout.addWidget(QLabel(address2, self), i, 0, 1, 2)
-		for item in venue[u'categories']:
-			if u'primary' in item and item[u'primary'] == "true":
+		for item in venue['categories']:
+			if 'primary' in item and item['primary'] == "true":
 				i += 1
-				gridLayout.addWidget(QLabel(item[u'name'], self), i, 0, 1, 2)
+				gridLayout.addWidget(QLabel(item['name'], self), i, 0, 1, 2)
 		i += 1
 		gridLayout.addWidget(Ruler(), i, 0, 1, 2)
 
-		if u'description' in venue:
+		if 'description' in venue:
 			i += 1
-			description_label = QLabel(venue[u'description'])
+			description_label = QLabel(venue['description'])
 			description_label.setWordWrap(True)
 			gridLayout.addWidget(description_label, i, 0, 1, 2)
 			i += 1
@@ -308,12 +313,12 @@ class VenueDetailsWindow(UberSquareWindow):
 		i += 1
 		gridLayout.addWidget(QLabel(times, self), i, 0)
 		i += 1
-		gridLayout.addWidget(QLabel("Total Checkins: " + str(venue[u'stats'][u'checkinsCount']), self), i, 0)
+		gridLayout.addWidget(QLabel("Total Checkins: " + str(venue['stats']['checkinsCount']), self), i, 0)
 		i += 1
-		gridLayout.addWidget(QLabel("Total Visitors: " + str(venue[u'stats'][u'usersCount']), self), i, 0)
+		gridLayout.addWidget(QLabel("Total Visitors: " + str(venue['stats']['usersCount']), self), i, 0)
 
-		if u'hereNow' in venue:
-			hereNow = venue[u'hereNow'][u'count']
+		if 'hereNow' in venue:
+			hereNow = venue['hereNow']['count']
 			if hereNow == 0:
 				hereNow = "There's no one here now."
 			elif hereNow == 1:
@@ -323,28 +328,28 @@ class VenueDetailsWindow(UberSquareWindow):
 			i += 1
 			gridLayout.addWidget(QLabel(hereNow, self), i, 0)
 
-		if u'phone' in venue[u'contact']:
+		if 'phone' in venue['contact']:
 			i += 1
-			phoneCallButton = QPushButton("Call (" + venue[u'contact'][u'formattedPhone'] + ")")
+			phoneCallButton = QPushButton("Call (" + venue['contact']['formattedPhone'] + ")")
 			phoneCallButton.setIcon(QIcon.fromTheme("general_call"))
 			self.connect(phoneCallButton, SIGNAL("clicked()"), self.startPhoneCall)
 			gridLayout.addWidget(phoneCallButton, i, 0, 1, 2)
 
-		if u'url' in venue:
+		if 'url' in venue:
 			i += 1
 			websiteButton = QPushButton("Visit Website")
 			websiteButton.setIcon(QIcon.fromTheme("general_web"))
 			self.connect(websiteButton, SIGNAL("clicked()"), self.openUrl)
 			gridLayout.addWidget(websiteButton, i, 0, 1, 2)
 
-		if u'mayor' in venue:
-			if u'user' in venue[u'mayor']:
-				mayorName = venue[u'mayor'][u'user'][u'firstName']
-				mayorCount = venue[u'mayor'][u'count']
+		if 'mayor' in venue:
+			if 'user' in venue['mayor']:
+				mayorName = venue['mayor']['user']['firstName']
+				mayorCount = venue['mayor']['count']
 				mayorText = mayorName + " is the mayor with " + str(mayorCount) + " checkins!"
 				mayorButton = QPushButton()
 				mayorButton.setText(mayorText)
-				mayorButton.setIcon(QIcon(foursquare.image(venue[u'mayor'][u'user'][u'photo'])))
+				mayorButton.setIcon(QIcon(foursquare.image(venue['mayor']['user']['photo'])))
 			else:
 				mayorButton = QLabel("This venue has no mayor")
 			i += 1
@@ -353,17 +358,17 @@ class VenueDetailsWindow(UberSquareWindow):
 		# TODO: menu
 		# TODO: specials
 
-		if u'tips' in venue:
+		if 'tips' in venue:
 			i += 1
-			if venue[u'tips'][u'count'] == 0:
+			if venue['tips']['count'] == 0:
 				gridLayout.addWidget(QLabel("<b>There isn't a single tip!</b>", self), i, 0)
 			else:
-				if venue[u'tips'][u'count'] == 1:
+				if venue['tips']['count'] == 1:
 					gridLayout.addWidget(QLabel("<b>Just one tip</b>", self), i, 0)
 				else:
-					gridLayout.addWidget(QLabel("<b>" + str(venue[u'tips'][u'count']) + " tips</b>", self), i, 0)
-				for group in venue[u'tips'][u'groups']:
-					for tip in group[u'items']:
+					gridLayout.addWidget(QLabel("<b>" + str(venue['tips']['count']) + " tips</b>", self), i, 0)
+				for group in venue['tips']['groups']:
+					for tip in group['items']:
 						i += 1
 						gridLayout.addWidget(Tip(tip), i, 0, 1, 2)
 						i += 1
@@ -373,7 +378,7 @@ class VenueDetailsWindow(UberSquareWindow):
 						gridLayout.addWidget(line, i, 0, 1, 2)
 
 			i += 1
-			gridLayout.addWidget(NewTipWidget(venue[u'id'], self), i, 0, 1, 2)
+			gridLayout.addWidget(NewTipWidget(venue['id'], self), i, 0, 1, 2)
 
 		if not fullDetails:
 			info_button_label = "Fetch full details"
@@ -390,10 +395,10 @@ class VenueDetailsWindow(UberSquareWindow):
 		self.connect(self, SIGNAL("showMoreInfo()"), self.more_info)
 
 	def startPhoneCall(self):
-		QDesktopServices.openUrl("tel:" + self.venue[u'contact']['phone'])
+		QDesktopServices.openUrl("tel:" + self.venue['contact']['phone'])
 
 	def openUrl(self):
-		QDesktopServices.openUrl(self.venue[u'url'])
+		QDesktopServices.openUrl(self.venue['url'])
 
 	def __showWaitingDialog(self):
 		self.waitDialog.exec_()
@@ -517,7 +522,7 @@ class NewVenueWindow(QMainWindow):
 
 	def category_selected(self, index):
 		if index != -1:
-			subcategories = self.category.pickSelector().model().get_data(index)[u'categories']
+			subcategories = self.category.pickSelector().model().get_data(index)['categories']
 			self.subcategory.setPickSelector(CategorySelector(subcategories))
 
 	def add_venue(self):
@@ -548,14 +553,14 @@ class NewVenueWindow(QMainWindow):
 
 		response = foursquare.venue_add(venue)
 
-		if response[u'meta'][u'code'] == 409:
+		if response['meta']['code'] == 409:
 			title = "Duplicate detected"
 
 			venues = dict()
 			i = 0
-			for venue in response[u'response'][u'candidateDuplicateVenues']:
+			for venue in response['response']['candidateDuplicateVenues']:
 				venues[i] = dict()
-				venues[i][u'venue'] = venue
+				venues[i]['venue'] = venue
 				i += 1
 
 			msgBox = QMessageBox(self)
@@ -564,7 +569,7 @@ class NewVenueWindow(QMainWindow):
 			msgBox.exec_()
 
 			self.venue['ignoreDuplicates'] = "true"
-			self.venue['ignoreDuplicatesKey'] = response[u'response'][u'ignoreDuplicatesKey']
+			self.venue['ignoreDuplicatesKey'] = response['response']['ignoreDuplicatesKey']
 
 			w = VenueListWindow("Posible matches", venues, self)
 			w.show()
@@ -574,5 +579,5 @@ class NewVenueWindow(QMainWindow):
 			msgBox.setWindowTitle("Venue added")
 			msgBox.exec_()
 
-			v = VenueDetailsWindow(self, response[u'response'][u'venue'], True)
+			v = VenueDetailsWindow(self, response['response']['venue'], True)
 			v.show()
