@@ -107,6 +107,7 @@ class Profile(QWidget):
 class MainWindow(UberSquareWindow):
     def __init__(self):
         super(MainWindow, self).__init__(None)
+        self.setAttribute(Qt.WA_Maemo5ShowProgressIndicator, True)
         self.setWindowTitle("UberSquare")
 
         self.centralWidget = QWidget()

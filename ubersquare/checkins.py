@@ -59,11 +59,12 @@ class CheckinConfirmation(QDialog):
                 self.fb.setChecked("facebook" in broadcast)
         #----
 
-        layout.addWidget(textLabel, 0, 0, 1, 2)
+        layout.addWidget(textLabel, 0, 0, 1, 3)
         layout.addWidget(self.tw, 1, 0)
         layout.addWidget(self.fb, 1, 1)
         layout.addWidget(okButton, 1, 2)
         #layout.addWidget(cancelButton, 1, 1)
+
     def broadcast(self):
         broadcast = "public"
         if self.tw.isChecked():

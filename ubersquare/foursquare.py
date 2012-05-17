@@ -181,16 +181,20 @@ def foursquare_get(path, params, read_cache=False, callback=None):
 			else:
 				return None
 		else:
-			response = row[0]
+			response = json.loads(row[0], "UTF-8")
 	else:
-		response = urllib.urlopen(BASE_URL + resource).read()
-		c.execute("INSERT OR REPLACE INTO queries VALUES (?, ?)", (resource, response))
+		response_unparsed = urllib.urlopen(BASE_URL + resource).read()
+		response = json.loads(response_unparsed, "UTF-8")
+
+		if "meta" in response and "errorType" in response["meta"]:
+			response = None
+			# TODO: Show some sort of error to notify the user that foursquare seems to be down (use the provided message)
+		else:
+			c.execute("INSERT OR REPLACE INTO queries VALUES (?, ?)", (resource, response_unparsed))
 		conn.commit()
 
 	conn.close()
 
-	if response:
-		response = json.loads(response, "UTF-8")
 	return response
 
 

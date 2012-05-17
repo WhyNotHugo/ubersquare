@@ -46,7 +46,7 @@ class UserProfile(QWidget):
         # FIXME: this may fail!
         location = user['user']['checkins']['items'][0]['venue']['name']
         lastSeen = user['user']['checkins']['items'][0]['createdAt']
-        lastSeen = datetime.fromtimestamp(lastSeen).strftime("%Y-%m-%d %X")
+        lastSeen = datetime.fromtimestamp(lastSeen).strftime("%d %b, %H:%M")
         location = "Last seen at <b>" +  location + "</b>, at <i>" + lastSeen + "</i>"
 
         description = description + "<br>" + location
@@ -175,11 +175,11 @@ class UserDetailsWindow(UberSquareWindow):
 
         c = CheckinConfirmation(self, venue)
         c.exec_()
-        if c.buttonRole(c.clickedButton()) == CheckinConfirmation.YesRole:
+        if c.result() == QDialog.Accepted:
             try:
                 # TODO: do this in a separate thread
                 ll = LocationProvider().get_ll(venue)
-                response = foursquare.checkin(venue, ll, self.shoutText.text())
+                response = foursquare.checkin(venue, ll, self.shoutText.text(), c.broadcast())
                 CheckinDetails(self, response).show()
             except IOError:
                 self.networkError.emit()
@@ -250,7 +250,7 @@ class UserListWidget(QListView):
     It contains a proxy that, in turn, contains a UserListModel.
     """
     def __init__(self, users, parent):
-        super(UserList, self).__init__(parent)
+        super(UserListWidget, self).__init__(parent)
         self.model = UserListModel(users)
 
         self.proxy = QSortFilterProxyModel(self)
