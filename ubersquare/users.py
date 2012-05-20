@@ -16,6 +16,9 @@
 
 from PySide.QtGui import QListView, QMainWindow, QWidget, QVBoxLayout, QLineEdit, QIcon, QScrollArea, QGridLayout, QLabel, QImage, QPixmap, QPushButton, QSortFilterProxyModel
 from PySide.QtCore import QAbstractListModel, Qt, Signal, SIGNAL
+from PySide.QtMaemo5 import QMaemo5InformationBox
+
+
 from custom_widgets import UberSquareWindow, Title
 from threads import UserDetailsThread, UserMayorships
 from venues import VenueListWindow
@@ -117,10 +120,10 @@ class UserDetailsWindow(UberSquareWindow):
             self.connect(checkinButton, SIGNAL("clicked()"), self.checkin)
             gridLayout.addWidget(checkinButton, i, 1)
 
-        if user['user']['relationship'] == "friend":
-            i += 1
-            #gridLayout.addWidget(QPushButton("Unfriend"), i, 0, 1, 2)
-            gridLayout.addWidget(QLabel("TODO: Unfriend"), i, 0, 1, 2)
+        # TODO!
+        #if user['user']['relationship'] == "friend":
+        #    i += 1
+        #    gridLayout.addWidget(QLabel("TODO: Unfriend"), i, 0, 1, 2)
         elif user['user']['relationship'] == "self":
             i += 1
             gridLayout.addWidget(QLabel("It's you!"), i, 0, 1, 2)
@@ -144,9 +147,11 @@ class UserDetailsWindow(UberSquareWindow):
         else:
             gridLayout.addWidget(QLabel("No mayorships"), i, 0)
         i += 1
-        gridLayout.addWidget(QPushButton("TODO: See places " + firstName + " has been to."), i, 0, 1, 2)
 
-        i += 1
+        # TODO!
+        #gridLayout.addWidget(QPushButton("TODO: See places " + firstName + " has been to."), i, 0, 1, 2)
+        #i += 1
+
         update_user_button = QPushButton("Refresh user details")
         update_user_button.setIcon(QIcon.fromTheme("general_refresh"))
         self.connect(update_user_button, SIGNAL("clicked()"), self.__update)
@@ -302,6 +307,8 @@ class UserListWindow(UberSquareWindow):
         self.setUsers(self.parent().users())
         if not self.shown:
             self.show()
+        else:
+            QMaemo5InformationBox.information(self, "Leaderboard updated")
 
     def filter(self, text):
         self.list.filter(text)

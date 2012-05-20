@@ -135,6 +135,8 @@ class VenueListWindow(UberSquareWindow):
 		self.setVenues(self.parent().venues())
 		if not self.shown:
 			self.show()
+		else:
+			QMaemo5InformationBox.information(self, "Venue list updated")
 
 	def filter(self, text):
 		self.list.filter(text)
@@ -268,18 +270,18 @@ class VenueDetailsWindow(UberSquareWindow):
 
 		# times
 		if 'beenHere' in venue:
-			if not fullDetails:
+			if isinstance(venue['beenHere'], int):
 				count = venue['beenHere']
 			else:
 				count = venue['beenHere']['count']
-			times = "<b>Yo've been here "
+			times = "<b>You've been here "
 			if count == 1:
 				times += "once"
 			else:
 				times += str(count) + " times"
 			times += "</b>"
 		else:
-			times = "<b>Yo've never been here</b>"
+			times = "<b>You've never been here</b>"
 
 		checkin_button = QPushButton("Check-in")
 		self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
@@ -424,6 +426,7 @@ class VenueDetailsWindow(UberSquareWindow):
 		if c.result() == QDialog.Accepted:
 			try:
 				# TODO: do this in a separate thread
+				QMaemo5InformationBox.information(self, "Checking in...")
 				ll = LocationProvider().get_ll(self.venue)
 				response = foursquare.checkin(self.venue, ll, self.shout_text.text(), c.broadcast())
 				CheckinDetails(self, response).show()

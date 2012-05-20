@@ -35,6 +35,7 @@ from datetime import datetime
 class Profile(QWidget):
     def __init__(self, parent=None):
         super(Profile, self).__init__(parent)
+        self.manualUpdate = False
         self.user = foursquare.get_user("self", foursquare.CacheOrGet)['user']
         self.photo_label = QLabel()
 
@@ -71,6 +72,7 @@ class Profile(QWidget):
         t = UpdateSelf(self)
         t.start()
         QMaemo5InformationBox.information(self, "Updating stats...", 1500)
+        self.manualUpdate = True
 
     def mousePressEvent(self, event):
         self.clicked.emit()
@@ -81,8 +83,10 @@ class Profile(QWidget):
 
     def __updateInfo(self, initial=False):
         if not initial:
-            QMaemo5InformationBox.information(self, "Stats updated!", 1500)
             self.user = foursquare.get_user("self", foursquare.CacheOrGet)['user']
+        if self.manualUpdate:
+            QMaemo5InformationBox.information(self, "Stats updated!", 1500)
+            self.manualUpdate = False
 
         badges = "<b>" + str(self.user['badges']['count']) + "</b> badges"
         mayorships = "<b>" + str(self.user['mayorships']['count']) + "</b> mayorships"
