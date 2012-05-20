@@ -1,6 +1,6 @@
 #!/usr/bin/python2.5
 # -*- coding: utf-8 -*-
-VERSION="0.4.4"
+VERSION="0.4.5"
 BUILD="1"
 
 from distutils.core import setup
@@ -9,6 +9,7 @@ import os
 import sys
 import py2deb
 import shutil
+import commands
 
 PKGNAME = "ubersquare"
 PKGDESC = "A foursquare client for maemo"
@@ -79,7 +80,8 @@ for root, dirs, files in os.walk(dir_name):
 print p
 p.generate(version      = VERSION,
            buildversion = BUILD,
-           changelog    = open("CHANGES").read(),
+           #changelog    = open("CHANGES").read(),
+           changelog    = commands.getoutput("git log --format=%ai%n%s%n%b"),
            tar          = True,
            dsc          = True,
            changes      = True,
