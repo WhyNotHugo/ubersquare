@@ -145,6 +145,7 @@ class MainWindow(UberSquareWindow):
 
         search_venues_button = QPushButton("Search/Explore")
         self.connect(search_venues_button, SIGNAL("clicked()"), self.search_venues_pushed)
+        self.searchDialog = SearchDialog(self)
 
         self.location_button = SignalEmittingValueButton("Location", self.locationSelected, self)
         self.location_button.setPickSelector(LocationProviderSelector())
@@ -237,8 +238,8 @@ class MainWindow(UberSquareWindow):
             self.showWaitingDialog.emit()
 
     def logout_pushed(self):
-        config_del("code")
-        config_del("access_token")
+        foursquare.config_del("code")
+        foursquare.config_del("access_token")
         msgBox = QMessageBox()
         msgBox.setText("I've gotten rid of your credentials. I'm going to close now, and if you run me again, it'll be like our first time all over again. Bye!")
         msgBox.setWindowTitle("Credentials forgotten")
@@ -269,14 +270,13 @@ class MainWindow(UberSquareWindow):
             self.networkError.emit()
 
     def search_venues_pushed(self):
-        dialog = SearchDialog(self)
-        dialog.exec_()
+        self.searchDialog.exec_()
 
-        if (dialog.result() != QDialog.Accepted):
+        if (self.searchDialog.result() != QDialog.Accepted):
             return None
 
-        venueName = dialog.text().encode('utf-8')
-        categoryId = dialog.category()
+        venueName = self.searchDialog.text().encode('utf-8')
+        categoryId = self.searchDialog.category()
         ll = LocationProvider().get_ll()
 
         try:
