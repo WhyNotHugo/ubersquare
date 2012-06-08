@@ -315,6 +315,33 @@ def checkin(venue, ll, shout="", broadcast=None):
 	return response
 
 
+from checkins import Checkin
+def checkin(checkin):
+	"""
+	Checks in the user at venue with lat/lng ll
+	"""
+	broadcast = checkin.broadcast
+	if not broadcast:
+		broadcast = config_get("broadcast")
+		if broadcast == None:
+			broadcast = BROADCAST_DEFAULT
+
+	print "Checking in with broadcast = " + broadcast
+
+	params = { 'shout': checkin.text,
+	           'venueId': checkin.venue['id'],
+	           'broadcast': broadcast,
+	           'll': checkin.ll
+	           }
+	response = foursquare_post("/checkins/add", params)
+
+	# This is, without doubt, the nastiest hack I've ever done!
+	print len(checkin_hooks)
+	for hook in checkin_hooks:
+		hook()
+	
+	return response
+
 def add_checkin_hook(hook):
 	checkin_hooks.append(hook)
 

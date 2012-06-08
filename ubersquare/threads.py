@@ -20,171 +20,171 @@ import time
 
 
 class VenueProviderThread(QThread):
-	def __init__(self, venueWindow, source, parent):
-		super(VenueProviderThread, self).__init__(parent)
-		self.venueWindow = venueWindow
-		self.source = source
-		self.parentWindow = parent
+    def __init__(self, venueWindow, source, parent):
+        super(VenueProviderThread, self).__init__(parent)
+        self.venueWindow = venueWindow
+        self.source = source
+        self.parentWindow = parent
 
-	def run(self):
-		try:
-			venues = self.source(foursquare.ForceFetch)
-			self.parentWindow.setVenues(venues)
-			self.parentWindow.hideWaitingDialog.emit()
-			self.venueWindow.updateVenues.emit()
-		except IOError:
-			self.parentWindow.networkError.emit()
+    def run(self):
+        try:
+            venues = self.source(foursquare.ForceFetch)
+            self.parentWindow.setVenues(venues)
+            self.parentWindow.hideWaitingDialog.emit()
+            self.venueWindow.updateVenues.emit()
+        except IOError:
+            self.parentWindow.networkError.emit()
 
 
 class VenueSearchThread(VenueProviderThread):
-	def __init__(self, venueWindow, source, venueName, ll, categoryId, limit, parent):
-		super(VenueSearchThread, self).__init__(venueWindow, source, parent)
-		self.venueWindow = venueWindow
-		self.venueName = venueName
-		self.ll = ll
-		self.categoryId = categoryId
-		self.limit = limit
+    def __init__(self, venueWindow, source, venueName, ll, categoryId, limit, parent):
+        super(VenueSearchThread, self).__init__(venueWindow, source, parent)
+        self.venueWindow = venueWindow
+        self.venueName = venueName
+        self.ll = ll
+        self.categoryId = categoryId
+        self.limit = limit
 
-	def run(self):
-		try:
-			venues = self.source(self.venueName, self.ll, self.categoryId, self.limit, foursquare.ForceFetch)
-			self.parentWindow.setVenues(venues)
-			self.parentWindow.hideWaitingDialog.emit()
-			self.venueWindow.updateVenues.emit()
-		except IOError:
-			self.parentWindow.networkError.emit()
+    def run(self):
+        try:
+            venues = self.source(self.venueName, self.ll, self.categoryId, self.limit, foursquare.ForceFetch)
+            self.parentWindow.setVenues(venues)
+            self.parentWindow.hideWaitingDialog.emit()
+            self.venueWindow.updateVenues.emit()
+        except IOError:
+            self.parentWindow.networkError.emit()
 
 
 class UserUpdaterThread(QThread):
-	def __init__(self, target, source, parent):
-		super(UserUpdaterThread, self).__init__(parent)
-		self.target = target
-		self.source = source
-		self.parentWindow = parent
+    def __init__(self, target, source, parent):
+        super(UserUpdaterThread, self).__init__(parent)
+        self.target = target
+        self.source = source
+        self.parentWindow = parent
 
-	def run(self):
-		try:
-			users = self.source(foursquare.ForceFetch)
-			self.parentWindow.setUsers(users)
-			self.parentWindow.hideWaitingDialog.emit()
-			self.target.updateUsers.emit()
-		except IOError:
-			self.parentWindow.networkError.emit()
-		return 0
+    def run(self):
+        try:
+            users = self.source(foursquare.ForceFetch)
+            self.parentWindow.setUsers(users)
+            self.parentWindow.hideWaitingDialog.emit()
+            self.target.updateUsers.emit()
+        except IOError:
+            self.parentWindow.networkError.emit()
+        return 0
 
 
 class ImageCacheThread(QThread):
-	def __init__(self, parent):
-		super(ImageCacheThread, self).__init__(parent)
-		self.__parent = parent
+    def __init__(self, parent):
+        super(ImageCacheThread, self).__init__(parent)
+        self.__parent = parent
 
-	def run(self):
-		try:
-			foursquare.init_category_icon_cache()
-			self.__parent.hideWaitingDialog.emit()
-		except IOError:
-			self.__parent.hideWaitingDialog.emit()
-			self.__parent.networkError.emit()
+    def run(self):
+        try:
+            foursquare.init_category_icon_cache()
+            self.__parent.hideWaitingDialog.emit()
+        except IOError:
+            self.__parent.hideWaitingDialog.emit()
+            self.__parent.networkError.emit()
 
 
 class TipMarkDoneBackgroundThread(QThread):
-	def __init__(self, tipId, marked, parent):
-		super(TipMarkDoneBackgroundThread, self).__init__(parent)
-		self.parentWindow = parent
-		self.marked = marked
-		self.tipId = tipId
+    def __init__(self, tipId, marked, parent):
+        super(TipMarkDoneBackgroundThread, self).__init__(parent)
+        self.parentWindow = parent
+        self.marked = marked
+        self.tipId = tipId
 
-	def run(self):
-		try:
-			foursquare.tip_markdone(self.tipId, self.marked)
-		except IOError:
-			self.parentWindow.networkError.emit()
+    def run(self):
+        try:
+            foursquare.tip_markdone(self.tipId, self.marked)
+        except IOError:
+            self.parentWindow.networkError.emit()
 
 
 class TipMarkTodoBackgroundThread(QThread):
-	def __init__(self, tipId, marked, parent):
-		super(TipMarkTodoBackgroundThread, self).__init__(parent)
-		self.parentWindow = parent
-		self.marked = marked
-		self.tipId = tipId
+    def __init__(self, tipId, marked, parent):
+        super(TipMarkTodoBackgroundThread, self).__init__(parent)
+        self.parentWindow = parent
+        self.marked = marked
+        self.tipId = tipId
 
-	def run(self):
-		try:
-			foursquare.tip_marktodo(self.tipId, self.marked)
-		except IOError:
-			self.parentWindow.networkError.emit()
+    def run(self):
+        try:
+            foursquare.tip_marktodo(self.tipId, self.marked)
+        except IOError:
+            self.parentWindow.networkError.emit()
 
 
 class UpdateSelf(QThread):
-	def __init__(self, parent):
-		super(UpdateSelf, self).__init__(parent)
-		self.__parent = parent
+    def __init__(self, parent):
+        super(UpdateSelf, self).__init__(parent)
+        self.__parent = parent
 
-	def run(self):
-		try:
-			foursquare.get_user("self", foursquare.ForceFetch)
-			self.__parent.selfUpdated.emit()
-		except IOError:
-			self.__parent.networkError.emit()
+    def run(self):
+        try:
+            foursquare.get_user("self", foursquare.ForceFetch)
+            self.__parent.selfUpdated.emit()
+        except IOError:
+            self.__parent.networkError.emit()
 
 
 class LeaveTipThread(QThread):
-	def __init__(self, venueId, text, parent):
-		super(LeaveTipThread, self).__init__(parent)
-		self.venueId = venueId
-		self.text = text
-		self.parentWindow = parent
+    def __init__(self, venueId, text, parent):
+        super(LeaveTipThread, self).__init__(parent)
+        self.venueId = venueId
+        self.text = text
+        self.parentWindow = parent
 
-	def run(self):
-		try:
-			foursquare.tip_add(self.venueId, self.text)
-			self.parentWindow.hideWaitingDialog.emit()
-			self.parentWindow.showMoreInfo.emit()
-		except IOError:
-			self.parentWindow.networkError.emit()
+    def run(self):
+        try:
+            foursquare.tip_add(self.venueId, self.text)
+            self.parentWindow.hideWaitingDialog.emit()
+            self.parentWindow.showMoreInfo.emit()
+        except IOError:
+            self.parentWindow.networkError.emit()
 
 
 class VenueDetailsThread(QThread):
-	def __init__(self, venueId, parent):
-		super(VenueDetailsThread, self).__init__(parent)
-		self.__parent = parent
-		self.venueId = venueId
+    def __init__(self, venueId, parent):
+        super(VenueDetailsThread, self).__init__(parent)
+        self.__parent = parent
+        self.venueId = venueId
 
-	def run(self):
-		try:
-			venue = foursquare.venues_venue(self.venueId, foursquare.ForceFetch)
-			if 'mayor' in venue:
-				if 'user' in venue['mayor']:
-					print "there's a mayor!"
-					foursquare.image(venue['mayor']['user']['photo'])
-			self.__parent.hideWaitingDialog.emit()
-			# This tiny sleep in necesary to (a) Avoid an Xorg warning, (b) achieve a smoother transition
-			time.sleep(0.15)
-			self.__parent.showMoreInfo.emit()
-		except IOError:
-			self.__parent.hideWaitingDialog.emit()
-			self.__parent.networkError.emit()
-		self.exec_()
-		self.exit(0)
+    def run(self):
+        try:
+            venue = foursquare.venues_venue(self.venueId, foursquare.ForceFetch)
+            if 'mayor' in venue:
+                if 'user' in venue['mayor']:
+                    print "there's a mayor!"
+                    foursquare.image(venue['mayor']['user']['photo'])
+            self.__parent.hideWaitingDialog.emit()
+            # This tiny sleep in necesary to (a) Avoid an Xorg warning, (b) achieve a smoother transition
+            time.sleep(0.15)
+            self.__parent.showMoreInfo.emit()
+        except IOError:
+            self.__parent.hideWaitingDialog.emit()
+            self.__parent.networkError.emit()
+        self.exec_()
+        self.exit(0)
 
 class UserDetailsThread(QThread):
-	def __init__(self, userId, parent):
-		super(UserDetailsThread, self).__init__(parent)
-		self.__parent = parent
-		self.userId = userId
+    def __init__(self, userId, parent):
+        super(UserDetailsThread, self).__init__(parent)
+        self.__parent = parent
+        self.userId = userId
 
-	def run(self):
-		try:
-			user = foursquare.get_user(self.userId, foursquare.ForceFetch)
-			photo = user['user']['photo']
-			foursquare.image(photo)
-			self.__parent.hideWaitingDialog.emit()
-			self.__parent.showUser.emit()
-		except IOError:
-			self.__parent.hideWaitingDialog.emit()
-			self.__parent.networkError.emit()
-		self.exec_()
-		self.exit(0)
+    def run(self):
+        try:
+            user = foursquare.get_user(self.userId, foursquare.ForceFetch)
+            photo = user['user']['photo']
+            foursquare.image(photo)
+            self.__parent.hideWaitingDialog.emit()
+            self.__parent.showUser.emit()
+        except IOError:
+            self.__parent.hideWaitingDialog.emit()
+            self.__parent.networkError.emit()
+        self.exec_()
+        self.exit(0)
 
 
 #########################
@@ -196,30 +196,49 @@ class UserDetailsThread(QThread):
 # In time, all threads will be like these ones
 
 class UserMayorships(QThread):
-	"""
-	Retrieves a user's mayorships. "parent" should implement:
-	the method
-	 - "setVenues"
-	the signals
-	 - "hideWaitingDialog"
-	 - "updateVenues"
-	 - "networkError"
-	"""
-	def __init__(self, venueWindow, userId, parent):
-		super(UserMayorships, self).__init__(parent)
-		self.__venueWindow = venueWindow
-		self.__userId = userId
-		self.__parent = parent
+    """
+    Retrieves a user's mayorships. "parent" should implement:
+    the method
+     - "setVenues"
+    the signals
+     - "hideWaitingDialog"
+     - "updateVenues"
+     - "networkError"
+    """
+    def __init__(self, venueWindow, userId, parent):
+        super(UserMayorships, self).__init__(parent)
+        self.__venueWindow = venueWindow
+        self.__userId = userId
+        self.__parent = parent
 
-	def run(self, cacheMode = foursquare.Cache.ForceFetch):
-		try:
-			self.__parent.setVenues(self.getVenues(cacheMode))
-			self.__parent.hideWaitingDialog.emit()
-			self.__venueWindow.updateVenues.emit()
-		except IOError:
-			self.__parent.networkError.emit()
+    def run(self, cacheMode = foursquare.Cache.ForceFetch):
+        try:
+            self.__parent.setVenues(self.getVenues(cacheMode))
+            self.__parent.hideWaitingDialog.emit()
+            self.__venueWindow.updateVenues.emit()
+        except IOError:
+            self.__parent.networkError.emit()
 
-	def getVenues(self, cacheMode):
-		return foursquare.user_mayorships(self.__userId, cacheMode)
+    def getVenues(self, cacheMode):
+        return foursquare.user_mayorships(self.__userId, cacheMode)
 
 
+class CheckinThread(QThread):
+    """
+    Checks-in into a venue.
+    parent must implement:
+     - checkinDone
+     - networkError
+    """
+
+    def __init__(self, checkin, parent):
+        super(CheckinThread, self).__init__(parent)
+        self.__parent = parent
+        self.__checkin = checkin
+
+    def run(self):
+        try:
+            response = foursquare.checkin(self.__checkin)
+            self.__parent.checkinDone.emit(response)
+        except IOError:
+            self.__parent.networkError.emit()
