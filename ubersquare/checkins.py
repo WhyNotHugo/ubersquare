@@ -23,6 +23,26 @@ except ImportError:
     import simplejson as json
 
 
+class Checkin:
+	def __init__(self, venue, ll, text, broadcast):
+		self.venue = venue
+		self.ll = ll
+		self.text = text
+		self.broadcast = broadcast
+
+	def venue():
+		return self.venue
+
+	def ll():
+		return self.ll
+
+	def text():
+		return self.text
+
+	def broadcast():
+		return self.broadcast
+
+
 class CheckinConfirmation(QDialog):
     def __init__(self, parent, venue):
         super(CheckinConfirmation, self).__init__(parent)

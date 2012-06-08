@@ -20,9 +20,9 @@ from PySide.QtGui import *
 from foursquare import Cache
 from locationProviders import LocationProvider
 from custom_widgets import CategorySelector, UberSquareWindow, Ruler, Title
-from threads import TipMarkTodoBackgroundThread, TipMarkDoneBackgroundThread, LeaveTipThread, VenueDetailsThread
+from threads import TipMarkTodoBackgroundThread, TipMarkDoneBackgroundThread, LeaveTipThread, VenueDetailsThread, CheckinThread
 from PySide.QtMaemo5 import *
-from checkins import CheckinConfirmation, CheckinDetails
+from checkins import CheckinConfirmation, CheckinDetails, Checkin
 
 import foursquare
 
@@ -286,11 +286,14 @@ class VenueDetailsWindow(UberSquareWindow):
 		checkin_button = QPushButton("Check-in")
 		self.connect(checkin_button, SIGNAL("clicked()"), self.checkin)
 
+		self.checkinDone = Signal()
+		self.connect(self, SIGNAL("checkinDone(str)"), self.__checkinDone)
+
 		i = 0
 		gridLayout.addWidget(checkin_button, i, 1)
-		self.shout_text = QLineEdit(self)
-		self.shout_text.setPlaceholderText("Shout something")
-		gridLayout.addWidget(self.shout_text, i, 0)
+		self.shoutText = QLineEdit(self)
+		self.shoutText.setPlaceholderText("Shout something")
+		gridLayout.addWidget(self.shoutText, i, 0)
 		i += 1
 		gridLayout.addWidget(Title(name, self), i, 0, 1, 2)
 		i += 1
@@ -424,14 +427,17 @@ class VenueDetailsWindow(UberSquareWindow):
 		c = CheckinConfirmation(self, self.venue)
 		c.exec_()
 		if c.result() == QDialog.Accepted:
+			QMaemo5InformationBox.information(self, "Checking in...")
 			try:
-				# TODO: do this in a separate thread
-				QMaemo5InformationBox.information(self, "Checking in...")
 				ll = LocationProvider().get_ll(self.venue)
-				response = foursquare.checkin(self.venue, ll, self.shout_text.text(), c.broadcast())
-				CheckinDetails(self, response).show()
+				checkin = Checkin(self.venue, ll, self.shoutText.text(), c.broadcast())
+
+				CheckinThread(checkin, self).start()
 			except IOError:
 				self.networkError.emit()
+
+	def __checkinDone(self, response):
+		CheckinDetails(self, response).show()
 
 
 class NewVenueWindow(QMainWindow):
