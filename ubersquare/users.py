@@ -14,7 +14,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-from PySide.QtGui import QListView, QMainWindow, QWidget, QVBoxLayout, QLineEdit, QIcon, QScrollArea, QGridLayout, QLabel, QImage, QPixmap, QPushButton, QSortFilterProxyModel
+from PySide.QtGui import QListView, QWidget, QVBoxLayout, QLineEdit, QIcon, QScrollArea, QGridLayout, QLabel, QImage, QPixmap, QPushButton, QSortFilterProxyModel, QDialog
 from PySide.QtCore import QAbstractListModel, Qt, Signal, SIGNAL
 from PySide.QtMaemo5 import QMaemo5InformationBox
 
