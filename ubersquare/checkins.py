@@ -14,7 +14,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-from PySide.QtGui import QDialog, QLabel, QPushButton, QVBoxLayout, QMessageBox, QWidget, QGridLayout, QCheckBox
+from PySide.QtGui import QDialog, QLabel, QPushButton, QVBoxLayout, QWidget, QGridLayout, QCheckBox
 from PySide.QtCore import SIGNAL
 import foursquare
 try:

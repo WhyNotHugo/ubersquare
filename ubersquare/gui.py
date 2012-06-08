@@ -17,7 +17,6 @@
 import sys
 from PySide.QtCore import *
 from PySide.QtGui import *
-from PySide.QtGui import QCheckBox
 
 from PySide.QtMaemo5 import QMaemo5ValueButton, QMaemo5InformationBox
 
@@ -36,7 +35,7 @@ class Profile(QWidget):
     def __init__(self, parent=None):
         super(Profile, self).__init__(parent)
         self.manualUpdate = False
-        self.user = foursquare.get_user("self", foursquare.CacheOrGet)['user']
+        self.user = foursquare.get_user("self", foursquare.Cache.CacheOrGet)['user']
         self.photo_label = QLabel()
 
         self.textLabel = QLabel()
@@ -96,7 +95,7 @@ class Profile(QWidget):
             location = self.user['checkins']['items'][0]['venue']['name']
             lastSeen = self.user['checkins']['items'][0]['createdAt']
             lastSeen = datetime.fromtimestamp(lastSeen).strftime("%Y-%m-%d %X")
-            location = "Last seen @" +  location # + "</b>, at <i>" + lastSeen + "</i>"
+            location = "Last seen @" + location # + "</b>, at <i>" + lastSeen + "</i>"
         else:
             location = "Never checked in anywhere!"
 
@@ -319,7 +318,7 @@ class MainWindow(UberSquareWindow):
 
 
 class SettingsDialog(UberSquareWindow):
-    def __init__(self, parent = None):
+    def __init__(self, parent=None):
         super(SettingsDialog, self).__init__(parent)
         self.setWindowTitle("Settings")
         
