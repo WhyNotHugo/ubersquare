@@ -15,7 +15,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
-from PySide.QtGui import QApplication, QDialog, QWidget, QScrollArea, QGridLayout, QLabel, QVBoxLayout, QImage, QPixmap
+from PySide.QtGui import QDialog, QWidget, QScrollArea, QGridLayout, QLabel, QVBoxLayout, QImage, QPixmap
 from PySide.QtCore import Qt
 from custom_widgets import Ruler
 import foursquare
