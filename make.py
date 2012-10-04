@@ -1,6 +1,6 @@
 #!/usr/bin/python2.5
 # -*- coding: utf-8 -*-
-VERSION="0.4.5"
+VERSION="0.4.6"
 BUILD="1"
 
 from distutils.core import setup
