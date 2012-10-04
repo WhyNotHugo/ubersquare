@@ -137,10 +137,12 @@ class MainWindow(UberSquareWindow):
         previous_venues_button = QPushButton("Visited")
         previous_venues_button.setIcon(QIcon.fromTheme("general_clock"))
         self.connect(previous_venues_button, SIGNAL("clicked()"), self.previous_venues_pushed)
+        self._previous_venues = False
 
         todo_venues_button = QPushButton("To-Do List")
         todo_venues_button.setIcon(QIcon.fromTheme("calendar_todo"))
         self.connect(todo_venues_button, SIGNAL("clicked()"), self.todo_venues_pushed)
+        self._todo_venues = False
 
         search_venues_button = QPushButton("Search/Explore")
         self.connect(search_venues_button, SIGNAL("clicked()"), self.search_venues_pushed)
@@ -247,22 +249,24 @@ class MainWindow(UberSquareWindow):
 
     def previous_venues_pushed(self):
         venues = foursquare.get_history(foursquare.CacheOrNull)
-        w = VenueListWindow("Visited Venues", venues, self)
-        t = VenueProviderThread(w, foursquare.get_history, self)
+        if not self._previous_venues:
+            self._previous_venues = VenueListWindow("Visited Venues", venues, self)
+        t = VenueProviderThread(self._previous_venues, foursquare.get_history, self)
         t.start()
         if venues:
-            w.show()
+            self._previous_venues.show()
         else:
             self.showWaitingDialog.emit()
 
     def todo_venues_pushed(self):
         try:
             venues = foursquare.lists_todos(foursquare.CacheOrNull)
-            w = VenueListWindow("To-Do Venues", venues, self)
-            t = VenueProviderThread(w, foursquare.lists_todos, self)
+            if not self._todo_venues:
+                self._todo_venues = VenueListWindow("To-Do Venues", venues, self)
+            t = VenueProviderThread(self._todo_venues, foursquare.lists_todos, self)
             t.start()
             if venues:
-                w.show()
+                self._todo_venues.show()
             else:
                 self.showWaitingDialog.emit()
         except IOError:
@@ -321,7 +325,7 @@ class SettingsDialog(UberSquareWindow):
     def __init__(self, parent=None):
         super(SettingsDialog, self).__init__(parent)
         self.setWindowTitle("Settings")
-        
+
         self.cw = QWidget(self)
         self.setCentralWidget(self.cw)
 
